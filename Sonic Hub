@@ -13,6 +13,8 @@ local userId = localPlayer.UserId
 -- ═══ BEYAZ LİSTE (Whitelist) ═══
 local whitelist = {
     "expoldeotherss",
+    "dracoza238",
+    "TetraVideo"
     -- Yeni kullanıcı eklemek için buraya yaz:
     -- "kullaniciAdi",
 }
