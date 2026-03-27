@@ -2366,31 +2366,32 @@ addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Bedava Aç)", false, function(v)
             end
         end)
         
-        -- ═══ Sürekli aktif tut + GUI görünür tut ═══
-        if autoLiftGPConn then pcall(function() autoLiftGPConn:Disconnect() end) end
-        autoLiftGPConn = RunService.Heartbeat:Connect(function()
-            if not States.AutoLiftGamepass then return end
-            pcall(function()
-                local a = LP:FindFirstChild("autoLiftEnabled")
-                if a then a.Value = true end
-                local al2 = LP:FindFirstChild("autoLiftOwned")
-                if al2 then al2.Value = true end
-                local hs = LP:FindFirstChild("hiddenStats")
-                if hs then
-                    local al = hs:FindFirstChild("autoLiftEnabled")
-                    if al then al.Value = true end
-                end
-                local pg = LP:FindFirstChild("PlayerGui")
-                if pg then
-                    for _, gui in pairs(pg:GetDescendants()) do
-                        pcall(function()
-                            if gui:IsA("GuiObject") and gui.Name:lower():find("autolift") then
-                                gui.Visible = true
-                            end
-                        end)
+        -- ═══ Sürekli aktif tut (spawn loop - 2 sn aralık, hafif) ═══
+        spawn(function()
+            while States.AutoLiftGamepass do
+                pcall(function()
+                    local a = LP:FindFirstChild("autoLiftEnabled")
+                    if a then a.Value = true end
+                    local al2 = LP:FindFirstChild("autoLiftOwned")
+                    if al2 then al2.Value = true end
+                    local hs = LP:FindFirstChild("hiddenStats")
+                    if hs then
+                        local al = hs:FindFirstChild("autoLiftEnabled")
+                        if al then al.Value = true end
                     end
-                end
-            end)
+                    local pg = LP:FindFirstChild("PlayerGui")
+                    if pg then
+                        for _, gui in pairs(pg:GetDescendants()) do
+                            pcall(function()
+                                if gui:IsA("GuiObject") and gui.Name:lower():find("autolift") then
+                                    gui.Visible = true
+                                end
+                            end)
+                        end
+                    end
+                end)
+                task.wait(2)
+            end
         end)
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
