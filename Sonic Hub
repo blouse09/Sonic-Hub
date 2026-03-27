@@ -1697,31 +1697,48 @@ local function startFarm()
                     if a then a.Value = true end
                 end)
                 
-                -- ADIM 4: Güç kas + rebirth kontrolü
-                farmStatusLabel.Text = "🟢 [4/5] Güç kasılıyor... (Rebirth için bekleniyor)"
+                -- ADIM 4: ⚡ TANRI HIZI GÜÇ KASMA + ANLIK REBIRTH ⚡
+                farmStatusLabel.Text = "🟢 [4/5] ⚡ TANRI HIZI güç kasılıyor..."
                 
-                -- RepTime bypass
-                pcall(function()
-                    if Character then
-                        for _, tool in pairs(Character:GetChildren()) do
-                            if tool:IsA("Tool") then
-                                local rt = tool:FindFirstChild("repTime")
-                                if rt then rt.Value = 0 end
+                -- ═══ SÜREKLI RepTime BYPASS LOOP (oyunu bozmadan en hızlı) ═══
+                local repTimeBypassConn = nil
+                repTimeBypassConn = spawn(function()
+                    while States.FarmActive do
+                        pcall(function()
+                            -- Character tool'ları
+                            if Character then
+                                for _, tool in pairs(Character:GetChildren()) do
+                                    if tool:IsA("Tool") then
+                                        local rt = tool:FindFirstChild("repTime")
+                                        if rt then rt.Value = 0 end
+                                        -- repCooldown, liftCooldown gibi değerleri de sıfırla
+                                        local rc = tool:FindFirstChild("repCooldown")
+                                        if rc then rc.Value = 0 end
+                                        local lc = tool:FindFirstChild("liftCooldown")
+                                        if lc then lc.Value = 0 end
+                                    end
+                                end
                             end
-                        end
-                    end
-                    local bp = LP:FindFirstChild("Backpack")
-                    if bp then
-                        for _, tool in pairs(bp:GetChildren()) do
-                            if tool:IsA("Tool") then
-                                local rt = tool:FindFirstChild("repTime")
-                                if rt then rt.Value = 0 end
+                            -- Backpack tool'ları
+                            local bp = LP:FindFirstChild("Backpack")
+                            if bp then
+                                for _, tool in pairs(bp:GetChildren()) do
+                                    if tool:IsA("Tool") then
+                                        local rt = tool:FindFirstChild("repTime")
+                                        if rt then rt.Value = 0 end
+                                        local rc = tool:FindFirstChild("repCooldown")
+                                        if rc then rc.Value = 0 end
+                                        local lc = tool:FindFirstChild("liftCooldown")
+                                        if lc then lc.Value = 0 end
+                                    end
+                                end
                             end
-                        end
+                        end)
+                        task.wait(0.08) -- Her 80ms'de cooldown sıfırla (lag yapmaz)
                     end
                 end)
                 
-                -- Rep spam başlat (Heartbeat bağlantısı)
+                -- ═══ ANA REP SPAM: Heartbeat (her frame 8 rep) ═══
                 if farmRepConn then pcall(function() farmRepConn:Disconnect() end) end
                 farmRepConn = RunService.Heartbeat:Connect(function()
                     if not States.FarmActive then return end
@@ -1731,110 +1748,146 @@ local function startFarm()
                             e:FireServer("rep")
                             e:FireServer("rep")
                             e:FireServer("rep")
-                        end
-                        -- RepTime sürekli sıfırla
-                        if Character then
-                            for _, tool in pairs(Character:GetChildren()) do
-                                if tool:IsA("Tool") then
-                                    local rt = tool:FindFirstChild("repTime")
-                                    if rt then rt.Value = 0 end
-                                end
-                            end
+                            e:FireServer("rep")
+                            e:FireServer("rep")
+                            e:FireServer("rep")
+                            e:FireServer("rep")
+                            e:FireServer("rep")
                         end
                     end)
                 end)
                 
-                -- Ek rep spam (paralel loop)
+                -- ═══ PARALEL REP SPAM LOOP 1 (20 rep / 0.02s) ═══
+                local farmRepLoop1 = true
                 spawn(function()
-                    while States.FarmActive do
+                    while States.FarmActive and farmRepLoop1 do
                         pcall(function()
                             local e = LP:FindFirstChild("muscleEvent")
                             if e then
-                                for i = 1, 10 do
+                                for i = 1, 20 do
                                     e:FireServer("rep")
                                 end
                             end
                         end)
-                        task.wait(0.05)
-                        if not States.FarmActive then break end
+                        task.wait(0.02)
                     end
                 end)
                 
-                -- Rebirth kontrolu dongusu
+                -- ═══ PARALEL REP SPAM LOOP 2 (15 rep / 0.03s) ═══
+                spawn(function()
+                    while States.FarmActive and farmRepLoop1 do
+                        pcall(function()
+                            local e = LP:FindFirstChild("muscleEvent")
+                            if e then
+                                for i = 1, 15 do
+                                    e:FireServer("rep")
+                                end
+                            end
+                        end)
+                        task.wait(0.03)
+                    end
+                end)
+                
+                -- ═══ PARALEL REP SPAM LOOP 3 (15 rep / 0.03s - ek katman) ═══
+                spawn(function()
+                    while States.FarmActive and farmRepLoop1 do
+                        pcall(function()
+                            local e = LP:FindFirstChild("muscleEvent")
+                            if e then
+                                for i = 1, 15 do
+                                    e:FireServer("rep")
+                                end
+                            end
+                        end)
+                        task.wait(0.03)
+                    end
+                end)
+                
+                -- ═══ REBIRTH KONTROL DÖNGÜSÜ (0.08s aralık - anında yakalama) ═══
                 local rebirthDone = false
+                local lastStatUpdate = 0
                 while States.FarmActive and not rebirthDone do
+                    local now = tick()
                     local str = getCurrentStrength()
                     local req = getRebirthRequirement()
                     local rb = getRebirthCount()
                     
-                    -- Guc hizi hesapla
-                    local elapsed = tick() - farmStartTime
-                    if elapsed > 1 then
-                        farmPowerPerSecond = (str - farmStartStrength) / elapsed
-                    end
-                    local perMin = farmPowerPerSecond * 60
-                    local perHour = farmPowerPerSecond * 3600
-                    local perDay = farmPowerPerSecond * 86400
-                    local perWeek = farmPowerPerSecond * 604800
-                    
-                    -- Rebirth hizi hesapla
-                    local rbElapsed = tick() - farmRebirthStartTime
-                    local rbDone = rb - farmRebirthStartCount
-                    if rbElapsed > 1 and rbDone > 0 then
-                        farmRebirthPerSecond = rbDone / rbElapsed
-                    end
-                    local rbPerMin = farmRebirthPerSecond * 60
-                    local rbPerHour = farmRebirthPerSecond * 3600
-                    local rbPerDay = farmRebirthPerSecond * 86400
-                    local rbPerWeek = farmRebirthPerSecond * 604800
-                    
-                    pcall(function()
-                        farmStatusLabel.Text = "🟢 [4/5] Güç: " .. formatNumber(str) .. " / " .. (req > 0 and formatNumber(req) or "?") .. "\nRebirth: " .. tostring(rb)
-                        farmRebirthLabel.Text = "🔄 Rebirth: " .. tostring(rb)
-                        farmSpeedLabel.Text = "📊 Güç Hızı:\n" ..
-                            "  ⏱ Dakikada: " .. formatNumber(perMin) .. "\n" ..
-                            "  ⏰ Saatte: " .. formatNumber(perHour) .. "\n" ..
-                            "  📅 Günde: " .. formatNumber(perDay) .. "\n" ..
-                            "  📆 Haftada: " .. formatNumber(perWeek)
-                        farmRebirthSpeedLabel.Text = "⚡ Rebirth Hızı:\n" ..
-                            "  ⏱ Dakikada: " .. string.format("%.1f", rbPerMin) .. "\n" ..
-                            "  ⏰ Saatte: " .. string.format("%.0f", rbPerHour) .. "\n" ..
-                            "  📅 Günde: " .. string.format("%.0f", rbPerDay) .. "\n" ..
-                            "  📆 Haftada: " .. string.format("%.0f", rbPerWeek)
-                    end)
-                    
-                    -- Auto Protein Egg (30 dakikada 1) - Sadece toggle açıksa ye
-                    if States.AutoProteinEgg then
-                        pcall(function()
-                            local eggResult = eatOneEgg()
-                            if eggResult then
-                                farmEggLabel.Text = "🥚 Egg: Protein Egg Yendi! ✅"
-                                game:GetService("StarterGui"):SetCore("SendNotification", {
-                                    Title = "🥚 Protein Egg",
-                                    Text = "Protein Egg yendi! Sonraki: 30 dk sonra",
-                                    Duration = 3
-                                })
-                            end
-                        end)
-                    else
-                        farmEggLabel.Text = "🥚 Egg: Kapalı (toggle açın)"
-                    end
-                    
-                    -- Rebirth yapilabilir mi kontrol et
-                    if canRebirth() then
-                        farmStatusLabel.Text = "🟡 [5/5] REBIRTH! Tribal Overlord takılıyor..."
+                    -- İstatistikleri her 0.5 saniyede güncelle (lag önleme)
+                    if (now - lastStatUpdate) >= 0.5 then
+                        lastStatUpdate = now
                         
-                        -- Rep spam durdur
+                        -- Guc hizi hesapla
+                        local elapsed = now - farmStartTime
+                        if elapsed > 1 then
+                            farmPowerPerSecond = (str - farmStartStrength) / elapsed
+                        end
+                        local perMin = farmPowerPerSecond * 60
+                        local perHour = farmPowerPerSecond * 3600
+                        local perDay = farmPowerPerSecond * 86400
+                        local perWeek = farmPowerPerSecond * 604800
+                        
+                        -- Rebirth hizi hesapla
+                        local rbElapsed = now - farmRebirthStartTime
+                        local rbDoneCount = rb - farmRebirthStartCount
+                        if rbElapsed > 1 and rbDoneCount > 0 then
+                            farmRebirthPerSecond = rbDoneCount / rbElapsed
+                        end
+                        local rbPerMin = farmRebirthPerSecond * 60
+                        local rbPerHour = farmRebirthPerSecond * 3600
+                        local rbPerDay = farmRebirthPerSecond * 86400
+                        local rbPerWeek = farmRebirthPerSecond * 604800
+                        
+                        pcall(function()
+                            farmStatusLabel.Text = "⚡ [4/5] Güç: " .. formatNumber(str) .. " / " .. (req > 0 and formatNumber(req) or "?") .. "\nRebirth: " .. tostring(rb)
+                            farmRebirthLabel.Text = "🔄 Rebirth: " .. tostring(rb)
+                            farmSpeedLabel.Text = "📊 Güç Hızı:\n" ..
+                                "  ⏱ Dakikada: " .. formatNumber(perMin) .. "\n" ..
+                                "  ⏰ Saatte: " .. formatNumber(perHour) .. "\n" ..
+                                "  📅 Günde: " .. formatNumber(perDay) .. "\n" ..
+                                "  📆 Haftada: " .. formatNumber(perWeek)
+                            farmRebirthSpeedLabel.Text = "⚡ Rebirth Hızı:\n" ..
+                                "  ⏱ Dakikada: " .. string.format("%.1f", rbPerMin) .. "\n" ..
+                                "  ⏰ Saatte: " .. string.format("%.0f", rbPerHour) .. "\n" ..
+                                "  📅 Günde: " .. string.format("%.0f", rbPerDay) .. "\n" ..
+                                "  📆 Haftada: " .. string.format("%.0f", rbPerWeek)
+                        end)
+                        
+                        -- Auto Protein Egg (30 dakikada 1) - Sadece toggle açıksa ye
+                        if States.AutoProteinEgg then
+                            pcall(function()
+                                local eggResult = eatOneEgg()
+                                if eggResult then
+                                    farmEggLabel.Text = "🥚 Egg: Protein Egg Yendi! ✅"
+                                    game:GetService("StarterGui"):SetCore("SendNotification", {
+                                        Title = "🥚 Protein Egg",
+                                        Text = "Protein Egg yendi! Sonraki: 30 dk sonra",
+                                        Duration = 3
+                                    })
+                                end
+                            end)
+                        else
+                            farmEggLabel.Text = "🥚 Egg: Kapalı (toggle açın)"
+                        end
+                    end
+                    
+                    -- ═══ ANLIK REBIRTH KONTROLÜ ═══
+                    if canRebirth() then
+                        -- Paralel rep loop'ları durdur
+                        farmRepLoop1 = false
+                        
+                        farmStatusLabel.Text = "🟡 REBIRTH! Pet değiştiriliyor..."
+                        
+                        -- Rep spam durdur (Heartbeat)
                         if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
                         
                         -- Tribal Overlord petlerini tak (ULTRA HIZLI)
                         ultraFastPetSwap(States.FarmPetTribalOverlord, States.FarmTribalCount)
-                        task.wait(0.03)
+                        task.wait(0.02)
                         
-                        -- FAST REBIRTH (animasyonsuz)
-                        farmStatusLabel.Text = "🟡 [5/5] FAST REBIRTH ATILIYOR!"
+                        -- ANLIK REBIRTH (animasyonsuz, 10 deneme art arda)
+                        farmStatusLabel.Text = "🟡 FAST REBIRTH ATILIYOR!"
                         
-                        -- Rebirth animasyon GUI'sini engelle
+                        -- Rebirth animasyon GUI'lerini engelle + yok et
                         pcall(function()
                             local pg = LP:FindFirstChild("PlayerGui")
                             if pg then
@@ -1849,13 +1902,13 @@ local function startFarm()
                             end
                         end)
                         
-                        -- Coklu hizli rebirth (animasyon beklemeden 5 deneme)
-                        for attempt = 1, 5 do
+                        -- 10 rebirth denemesi art arda (en az biri tutar)
+                        for attempt = 1, 10 do
                             doRebirth()
-                            task.wait(0.03)
+                            task.wait(0.01)
                         end
                         
-                        -- Animasyon GUI'sini tekrar temizle
+                        -- Animasyon kalıntılarını temizle
                         pcall(function()
                             local pg = LP:FindFirstChild("PlayerGui")
                             if pg then
@@ -1863,20 +1916,21 @@ local function startFarm()
                                     pcall(function()
                                         if gui:IsA("Frame") and gui.Name:lower():find("rebirth") then
                                             gui.Visible = false
+                                            gui:Destroy()
                                         end
                                     end)
                                 end
                             end
                         end)
                         
-                        task.wait(0.05)
+                        task.wait(0.02)
                         
-                        -- Swift Samurai geri tak
+                        -- Swift Samurai geri tak (ultra hızlı)
                         farmStatusLabel.Text = "🟢 Swift Samurai geri takılıyor..."
                         ultraFastPetSwap(States.FarmPetSwiftSamurai, States.FarmSwiftCount)
-                        task.wait(0.03)
+                        task.wait(0.02)
                         
-                        -- Guc hizi takibini sifirla
+                        -- Güç hızı takibini sıfırla
                         farmStartTime = tick()
                         farmStartStrength = getCurrentStrength()
                         farmPowerPerSecond = 0
@@ -1889,14 +1943,14 @@ local function startFarm()
                         rebirthDone = true
                     end
                     
-                    task.wait(0.3)
+                    task.wait(0.08) -- 80ms aralık: rebirth anını kaçırmaz + lag yapmaz
                 end
                 
                 -- Rep spam durdur (rebirth sonrası)
                 if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
                 
-                -- Kısa bekleme sonrası tekrarla
-                task.wait(0.2)
+                -- Hemen tekrarla (bekleme yok)
+                task.wait(0.05)
             end)
         end
         
