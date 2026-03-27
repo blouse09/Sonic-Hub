@@ -1456,24 +1456,32 @@ local function pressE()
             end
         end
     end)
-    -- Yöntem 4: Backpack'ten weight tool'u al ve aktive et
+    -- Yöntem 4: Karakterdeki mevcut tool'u aktive et (backpack'ten dumbbell equiplemeye ÇALIŞMA)
     pcall(function()
         if Character then
+            -- Zaten elinde tool varsa sadece onu aktive et
+            local hasTool = false
             for _, tool in pairs(Character:GetChildren()) do
                 if tool:IsA("Tool") then
                     pcall(function() tool:Activate() end)
+                    hasTool = true
                 end
             end
-        end
-        local backpack = LP:FindFirstChild("Backpack")
-        if backpack and Character then
-            for _, tool in pairs(backpack:GetChildren()) do
-                if tool:IsA("Tool") then
-                    local n = tool.Name:lower()
-                    if n:find("bar") or n:find("squat") or n:find("lift") or n:find("weight") or n:find("dumbbell") or n:find("jungle") then
-                        pcall(function() Humanoid:EquipTool(tool) end)
-                        task.wait(0.1)
-                        pcall(function() tool:Activate() end)
+            -- Elinde tool YOKSA backpack'ten sadece ağırlık al (dumbbell DEĞİL)
+            if not hasTool then
+                local backpack = LP:FindFirstChild("Backpack")
+                if backpack then
+                    for _, tool in pairs(backpack:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            local n = tool.Name:lower()
+                            -- Sadece bar/squat/lift/jungle equip et, dumbbell HAYIR
+                            if (n:find("bar") or n:find("squat") or n:find("lift") or n:find("jungle")) and not n:find("dumbbell") and not n:find("dumb") then
+                                pcall(function() Humanoid:EquipTool(tool) end)
+                                task.wait(0.1)
+                                pcall(function() tool:Activate() end)
+                                break -- Sadece bir tane equip et
+                            end
+                        end
                     end
                 end
             end
@@ -1710,30 +1718,7 @@ local function eatOneEgg()
             end
         end
         
-        -- YONTEM 4: Son care - tool equip (sadece agirlik yoksa)
-        if not eaten then
-            local backpack = LP:FindFirstChild("Backpack")
-            if backpack then
-                for _, tool in pairs(backpack:GetChildren()) do
-                    if eaten then break end
-                    if tool:IsA("Tool") then
-                        local n = tool.Name:lower()
-                        if n:find("egg") or n:find("protein") then
-                            pcall(function()
-                                if Character and Humanoid then
-                                    Humanoid:EquipTool(tool)
-                                    task.wait(0.15)
-                                    tool:Activate()
-                                    task.wait(0.2)
-                                end
-                            end)
-                            eaten = true
-                            lastEggTime = tick()
-                        end
-                    end
-                end
-            end
-        end
+        -- YONTEM 4: KALDIRILDI (tool equip yapmıyoruz - ağırlık düşürmesin)
     end)
     return eaten
 end
@@ -2127,15 +2112,93 @@ local function startFarm()
     end)
 end
 
--- START FARM butonu
-addToggle(Pages.Farm, "🚀 START FARM (Başlat/Durdur)", false, function(v)
+-- REBIRTH FARM butonu (eski START FARM)
+addToggle(Pages.Farm, "🔄 Rebirth Farm (Başlat/Durdur)", false, function(v)
     if v then
         startFarm()
     else
         stopFarm()
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Farm",
-            Text = "Farm durduruldu.",
+            Text = "Rebirth Farm durduruldu.",
+            Duration = 3
+        })
+    end
+end)
+
+-- ⚡ FAST FARM (olduğun yerde tanrı hızı rep spam - rebirth yok)
+States.FastFarmActive = false
+local fastFarmConn = nil
+local fastFarmRepSpam = false
+
+local function stopFastFarm()
+    States.FastFarmActive = false
+    fastFarmRepSpam = false
+    if fastFarmConn then pcall(function() fastFarmConn:Disconnect() end); fastFarmConn = nil end
+    farmStatusLabel.Text = "⏸ Fast Farm durduruldu"
+end
+
+addToggle(Pages.Farm, "⚡ Fast Farm (Sadece Kas - Rebirth Yok)", false, function(v)
+    States.FastFarmActive = v
+    if v then
+        -- Rebirth Farm aktifse durdur
+        if States.FarmActive then stopFarm() end
+        
+        fastFarmRepSpam = true
+        farmStatusLabel.Text = "🔥 Fast Farm aktif - TANRI HIZI kasmal"
+        farmStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 0)
+        
+        -- Heartbeat: Her frame 10 rep + cooldown bypass
+        if fastFarmConn then pcall(function() fastFarmConn:Disconnect() end) end
+        fastFarmConn = RunService.Heartbeat:Connect(function()
+            if not fastFarmRepSpam then return end
+            pcall(function()
+                local e = LP:FindFirstChild("muscleEvent")
+                if e then
+                    for i = 1, 10 do e:FireServer("rep") end
+                end
+                if Character then
+                    for _, tool in pairs(Character:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            local rt = tool:FindFirstChild("repTime")
+                            if rt then rt.Value = 0 end
+                            local rc = tool:FindFirstChild("repCooldown")
+                            if rc then rc.Value = 0 end
+                            local lc = tool:FindFirstChild("liftCooldown")
+                            if lc then lc.Value = 0 end
+                        end
+                    end
+                end
+            end)
+        end)
+        
+        -- Paralel loop'lar
+        for loopIdx = 1, 5 do
+            spawn(function()
+                local repCount = (loopIdx <= 2) and 25 or 20
+                local interval = (loopIdx <= 2) and 0.01 or 0.02
+                while fastFarmRepSpam and States.FastFarmActive do
+                    pcall(function()
+                        local e = LP:FindFirstChild("muscleEvent")
+                        if e then
+                            for i = 1, repCount do e:FireServer("rep") end
+                        end
+                    end)
+                    task.wait(interval)
+                end
+            end)
+        end
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "⚡ Fast Farm",
+            Text = "Tanrı hızı rep spam aktif! Sadece güç kasıyor.",
+            Duration = 4
+        })
+    else
+        stopFastFarm()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Fast Farm",
+            Text = "Fast Farm durduruldu.",
             Duration = 3
         })
     end
@@ -2926,7 +2989,7 @@ end)
 
 -- === PET TAB (ODAK) ===
 createPage("Pet")
-createTab("Pet", "🐾", 2)
+-- createTab("Pet", "🐾", 2) -- KALDIRILDI: Sidebar'dan gizlendi
 
 addSection(Pages.Pet, "⭐ Rep Speed Bonus (CRITICAL)")
 addInfo(Pages.Pet, "Applies Swift Samurai's 15% rep bonus to ALL your pets. Hooks calculatePetRepTimeBoost.")
@@ -3018,7 +3081,7 @@ end)
 
 -- === PLAYER TAB ===
 createPage("Player")
-createTab("Player", "🧍", 3)
+-- createTab("Player", "🧍", 3) -- KALDIRILDI
 
 addSection(Pages.Player, "Movement")
 
@@ -3144,7 +3207,7 @@ end)
 
 -- === TELEPORT TAB ===
 createPage("TP")
-createTab("TP", "🌍", 4)
+-- createTab("TP", "🌍", 4) -- KALDIRILDI
 
 addSection(Pages.TP, "Regions & Islands")
 
@@ -3209,7 +3272,7 @@ end
 
 -- === TRADE TAB ===
 createPage("Trade")
-createTab("Trade", "🔄", 5)
+-- createTab("Trade", "🔄", 5) -- KALDIRILDI
 
 addSection(Pages.Trade, "Trade System")
 addInfo(Pages.Trade, "Send trade requests to players or auto trade.")
@@ -3265,7 +3328,7 @@ end
 
 -- === EXTRAS TAB ===
 createPage("Extra")
-createTab("Extra", "⭐", 6)
+-- createTab("Extra", "⭐", 6) -- KALDIRILDI
 
 addSection(Pages.Extra, "Good Mode")
 
@@ -3671,7 +3734,7 @@ end)
 
 -- === KILL TAB ===
 createPage("Kill")
-createTab("Kill", "⚔", 7)
+-- createTab("Kill", "⚔", 7) -- KALDIRILDI
 
 addSection(Pages.Kill, "Auto Kill (Kill Everyone)")
 addInfo(Pages.Kill, "Teleports all players to you, enables NoClip, and punches non-stop.")
@@ -3849,7 +3912,7 @@ end)
 
 -- === STATS TAB (Player Statistics) ===
 createPage("Stats")
-createTab("Stats", "📊", 8)
+-- createTab("Stats", "📊", 8) -- KALDIRILDI
 
 addSection(Pages.Stats, "Player Statistics")
 addInfo(Pages.Stats, "Select a player to view their statistics.")
@@ -3961,7 +4024,7 @@ end)
 
 -- === AYARLAR TAB ===
 createPage("Ayar")
-createTab("Ayar", "⚙", 9)
+-- createTab("Ayar", "⚙", 9) -- KALDIRILDI
 
 addSection(Pages.Ayar, L("debug"))
 
@@ -4029,6 +4092,228 @@ addSection(Pages.Ayar, L("gui_section"))
 
 addButton(Pages.Ayar, L("close_gui"), function()
     ScreenGui:Destroy()
+end)
+
+-- ════════════════════════════════════════════════════════
+-- === MISC TAB (EKLENTILER) ===
+-- ════════════════════════════════════════════════════════
+createPage("Misc")
+createTab("Misc", "🛠", 2)
+
+addSection(Pages.Misc, "🛡 Anti-Lag")
+
+-- Anti-Lag toggle
+States.AntiLagEnabled = false
+local antiLagConns = {}
+
+addToggle(Pages.Misc, "🛡 Anti-Lag (Performans Arttır)", false, function(v)
+    States.AntiLagEnabled = v
+    if v then
+        pcall(function()
+            -- Partiçülleri kapat
+            local lighting = game:GetService("Lighting")
+            lighting.GlobalShadows = false
+            lighting.FogEnd = 9e9
+            
+            -- PlayerGui'deki gereksiz efektleri kapat
+            local pg = LP:FindFirstChild("PlayerGui")
+            if pg then
+                for _, gui in pairs(pg:GetDescendants()) do
+                    pcall(function()
+                        if gui:IsA("ParticleEmitter") then
+                            gui.Enabled = false
+                        elseif gui:IsA("Trail") then
+                            gui.Enabled = false
+                        elseif gui:IsA("Beam") then
+                            gui.Enabled = false
+                        end
+                    end)
+                end
+            end
+            
+            -- Workspace'teki parçacık ve efektleri kapat
+            for _, obj in pairs(workspace:GetDescendants()) do
+                pcall(function()
+                    if obj:IsA("ParticleEmitter") then
+                        obj.Enabled = false
+                    elseif obj:IsA("Trail") then
+                        obj.Enabled = false
+                    elseif obj:IsA("Beam") then
+                        obj.Enabled = false
+                    elseif obj:IsA("Fire") then
+                        obj.Enabled = false
+                    elseif obj:IsA("Smoke") then
+                        obj.Enabled = false
+                    elseif obj:IsA("Sparkles") then
+                        obj.Enabled = false
+                    end
+                end)
+            end
+            
+            -- Yeni eklenen efektleri de kapat
+            local conn = workspace.DescendantAdded:Connect(function(obj)
+                if not States.AntiLagEnabled then return end
+                pcall(function()
+                    if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+                        obj.Enabled = false
+                    end
+                end)
+            end)
+            table.insert(antiLagConns, conn)
+            
+            -- Render kalitesini düşür
+            pcall(function()
+                settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            end)
+        end)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🛡 Anti-Lag",
+            Text = "Anti-Lag aktif! Parçacıklar, efektler ve gölgeler kapatıldı.",
+            Duration = 4
+        })
+    else
+        -- Kapatırken oyunu bozma - efektleri geri aç
+        for _, conn in pairs(antiLagConns) do
+            pcall(function() conn:Disconnect() end)
+        end
+        antiLagConns = {}
+        
+        pcall(function()
+            local lighting = game:GetService("Lighting")
+            lighting.GlobalShadows = true
+            
+            -- Parçacıkları geri aç
+            for _, obj in pairs(workspace:GetDescendants()) do
+                pcall(function()
+                    if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+                        obj.Enabled = true
+                    end
+                end)
+            end
+            
+            -- Render kalitesini geri yükselt
+            pcall(function()
+                settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+            end)
+        end)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🛡 Anti-Lag",
+            Text = "Anti-Lag kapatıldı. Efektler geri açıldı.",
+            Duration = 3
+        })
+    end
+end)
+
+addSection(Pages.Misc, "💪 Kas Görseli")
+
+-- Kas logosu gizle/göster toggle
+States.HideMusclePopup = false
+local muscleHideConns = {}
+
+addToggle(Pages.Misc, "💪 Kas Logosunu Gizle (Kazanç + Güç Yazısı)", false, function(v)
+    States.HideMusclePopup = v
+    if v then
+        pcall(function()
+            local pg = LP:FindFirstChild("PlayerGui")
+            if pg then
+                -- Kas kazanç popup'larını, kas logosunu ve altındaki güç yazısını gizle
+                for _, gui in pairs(pg:GetDescendants()) do
+                    pcall(function()
+                        local n = gui.Name:lower()
+                        -- Kas logosu ve popup'ları
+                        if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+                            if n:find("muscle") or n:find("bicep") or n:find("arm") or n:find("flex") or n:find("strengthgain") or n:find("powergain") then
+                                gui.Visible = false
+                            end
+                        end
+                        -- Kas kazanım yazısı ve güç miktarı
+                        if gui:IsA("TextLabel") then
+                            if n:find("strengthgain") or n:find("powergain") or n:find("musclegain") or n:find("repgain") or n:find("gaintext") or n:find("gainlabel") then
+                                gui.Visible = false
+                            end
+                        end
+                        -- Frame içindeki kas popup'ları
+                        if gui:IsA("Frame") then
+                            if n:find("musclepopup") or n:find("strengthpopup") or n:find("gainpopup") or n:find("repinfo") then
+                                gui.Visible = false
+                            end
+                        end
+                    end)
+                end
+                
+                -- Yeni eklenen popup'ları da gizle
+                local conn = pg.DescendantAdded:Connect(function(gui)
+                    if not States.HideMusclePopup then return end
+                    task.wait(0.01)
+                    pcall(function()
+                        local n = gui.Name:lower()
+                        if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+                            if n:find("muscle") or n:find("bicep") or n:find("arm") or n:find("flex") or n:find("strengthgain") or n:find("powergain") then
+                                gui.Visible = false
+                            end
+                        end
+                        if gui:IsA("TextLabel") then
+                            if n:find("strengthgain") or n:find("powergain") or n:find("musclegain") or n:find("repgain") or n:find("gaintext") or n:find("gainlabel") then
+                                gui.Visible = false
+                            end
+                        end
+                        if gui:IsA("Frame") then
+                            if n:find("musclepopup") or n:find("strengthpopup") or n:find("gainpopup") or n:find("repinfo") then
+                                gui.Visible = false
+                            end
+                        end
+                    end)
+                end)
+                table.insert(muscleHideConns, conn)
+            end
+        end)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "💪 Kas Görseli",
+            Text = "Kas logosu, kazanç ve güç yazısı gizlendi.",
+            Duration = 4
+        })
+    else
+        -- Gizlemeyi kapat, görselleri geri getir
+        for _, conn in pairs(muscleHideConns) do
+            pcall(function() conn:Disconnect() end)
+        end
+        muscleHideConns = {}
+        
+        pcall(function()
+            local pg = LP:FindFirstChild("PlayerGui")
+            if pg then
+                for _, gui in pairs(pg:GetDescendants()) do
+                    pcall(function()
+                        local n = gui.Name:lower()
+                        if gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+                            if n:find("muscle") or n:find("bicep") or n:find("arm") or n:find("flex") or n:find("strengthgain") or n:find("powergain") then
+                                gui.Visible = true
+                            end
+                        end
+                        if gui:IsA("TextLabel") then
+                            if n:find("strengthgain") or n:find("powergain") or n:find("musclegain") or n:find("repgain") or n:find("gaintext") or n:find("gainlabel") then
+                                gui.Visible = true
+                            end
+                        end
+                        if gui:IsA("Frame") then
+                            if n:find("musclepopup") or n:find("strengthpopup") or n:find("gainpopup") or n:find("repinfo") then
+                                gui.Visible = true
+                            end
+                        end
+                    end)
+                end
+            end
+        end)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "💪 Kas Görseli",
+            Text = "Kas logosu ve yazılar geri açıldı.",
+            Duration = 3
+        })
+    end
 end)
 
 ------------------------------------------------------------
