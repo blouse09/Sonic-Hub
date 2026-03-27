@@ -2136,6 +2136,117 @@ end)
 
 addSection(Pages.Farm, "Ek Farm Özellikleri")
 
+-- 🏋 Auto Lift Gamepass Toggle
+States.AutoLiftGamepass = false
+local autoLiftGPConn = nil
+
+addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Aktive Et)", false, function(v)
+    States.AutoLiftGamepass = v
+    if v then
+        -- YÖNTEM 1: autoLiftEnabled değerini aç
+        pcall(function()
+            local a = LP:FindFirstChild("autoLiftEnabled")
+            if a then a.Value = true end
+        end)
+        
+        -- YÖNTEM 2: muscleEvent ile autoLift aktive et
+        pcall(function()
+            local e = LP:FindFirstChild("muscleEvent")
+            if e then
+                e:FireServer("activateAutoLift")
+                e:FireServer("autoLift")
+                e:FireServer("useGamepass", "Auto Lift")
+                e:FireServer("gamepassActivate", "Auto Lift")
+            end
+        end)
+        
+        -- YÖNTEM 3: rEvents üzerinden dene
+        pcall(function()
+            local rEvents = RS:FindFirstChild("rEvents")
+            if rEvents then
+                -- autoLift remote'u
+                local autoLiftRemote = rEvents:FindFirstChild("autoLiftEvent") 
+                    or rEvents:FindFirstChild("autoLiftRemote")
+                    or rEvents:FindFirstChild("activateAutoLift")
+                if autoLiftRemote then
+                    if autoLiftRemote:IsA("RemoteEvent") then
+                        autoLiftRemote:FireServer()
+                    elseif autoLiftRemote:IsA("RemoteFunction") then
+                        autoLiftRemote:InvokeServer()
+                    end
+                end
+                
+                -- gamepass remote'u
+                local gpRemote = rEvents:FindFirstChild("gamepassEvent")
+                    or rEvents:FindFirstChild("useGamepassEvent")
+                    or rEvents:FindFirstChild("purchaseHandler")
+                if gpRemote then
+                    pcall(function()
+                        if gpRemote:IsA("RemoteEvent") then
+                            gpRemote:FireServer("Auto Lift")
+                            gpRemote:FireServer("autoLift")
+                        elseif gpRemote:IsA("RemoteFunction") then
+                            gpRemote:InvokeServer("Auto Lift")
+                            gpRemote:InvokeServer("autoLift")
+                        end
+                    end)
+                end
+            end
+        end)
+        
+        -- YÖNTEM 4: PlayerGui'deki Auto Lift butonunu simüle et
+        pcall(function()
+            local pg = LP:FindFirstChild("PlayerGui")
+            if pg then
+                for _, gui in pairs(pg:GetDescendants()) do
+                    pcall(function()
+                        if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+                            local n = gui.Name:lower()
+                            if n:find("autolift") or n:find("auto_lift") or n:find("autolifttoggle") then
+                                -- Butonu aktive et
+                                pcall(function()
+                                    if gui:IsA("TextButton") then
+                                        gui.Text = "ON"
+                                    end
+                                end)
+                            end
+                        end
+                    end)
+                end
+            end
+        end)
+        
+        -- Sürekli autoLiftEnabled true tut (loop)
+        if autoLiftGPConn then pcall(function() autoLiftGPConn:Disconnect() end) end
+        autoLiftGPConn = RunService.Heartbeat:Connect(function()
+            if not States.AutoLiftGamepass then return end
+            pcall(function()
+                local a = LP:FindFirstChild("autoLiftEnabled")
+                if a then a.Value = true end
+            end)
+        end)
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🏋 Auto Lift",
+            Text = "Auto Lift Gamepass aktive edildi! Otomatik ağırlık kaldırma açık.",
+            Duration = 4
+        })
+    else
+        -- Kapat
+        pcall(function()
+            local a = LP:FindFirstChild("autoLiftEnabled")
+            if a then a.Value = false end
+        end)
+        if autoLiftGPConn then pcall(function() autoLiftGPConn:Disconnect() end); autoLiftGPConn = nil end
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🏋 Auto Lift",
+            Text = "Auto Lift kapatıldı.",
+            Duration = 3
+        })
+    end
+end)
+
 -- 🥚 Auto Protein Egg Toggle (isteğe bağlı)
 addToggle(Pages.Farm, "🥚 Auto Protein Egg (30dk/1 yumurta)", false, function(v)
     States.AutoProteinEgg = v
