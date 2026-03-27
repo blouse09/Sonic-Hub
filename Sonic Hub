@@ -1770,18 +1770,14 @@ local function startFarm()
     States.FarmActive = true
     local weightData = weightLocations[States.SelectedWeight]
     
-    -- Guc hizi takibini baslat
+    -- İstatistik takibi
     farmStartTime = tick()
     farmStartStrength = getCurrentStrength()
     farmLastStrength = farmStartStrength
     farmPowerPerSecond = 0
-    
-    -- Rebirth hizi takibini baslat
     farmRebirthStartTime = tick()
     farmRebirthStartCount = getRebirthCount()
     farmRebirthPerSecond = 0
-    
-    -- Egg timer'i baslat (ilk egg hemen yenebilir)
     lastEggTime = 0
     
     farmStatusLabel.Text = "🟢 Farm başlatılıyor..."
@@ -1789,68 +1785,205 @@ local function startFarm()
     
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "⚡ Farm Started!",
-        Text = weightData.name .. " seçildi. Farm döngüsü başlıyor!",
+        Text = weightData.name .. " seçildi. TANRI HIZI farm başlıyor!",
         Duration = 4
     })
     
-    -- Timer loop (her saniye guncellenir)
-    if farmElapsedConn then pcall(function() farmElapsedConn:Disconnect() end) end
+    -- ═══════════════════════════════════════════════════════
+    -- TIMER LOOP (her saniye güncelle)
+    -- ═══════════════════════════════════════════════════════
     spawn(function()
         while States.FarmActive do
-            local elapsed = tick() - farmStartTime
             pcall(function()
+                local elapsed = tick() - farmStartTime
                 farmTimerLabel.Text = "⏱ Süre: " .. formatTime(elapsed)
                 
-                -- Egg cooldown durumunu goster
                 local eggElapsed = tick() - lastEggTime
-                if lastEggTime == 0 then
+                if not States.AutoProteinEgg then
+                    farmEggLabel.Text = "🥚 Egg: Kapalı"
+                elseif lastEggTime == 0 then
                     farmEggLabel.Text = "🥚 Egg: İlk yumurta yenecek..."
                 elseif eggElapsed >= EGG_COOLDOWN then
-                    farmEggLabel.Text = "🥚 Egg: Hazır! Yenecek..."
+                    farmEggLabel.Text = "🥚 Egg: Hazır!"
                 else
                     local remaining = math.ceil(EGG_COOLDOWN - eggElapsed)
-                    local rm = math.floor(remaining / 60)
-                    local rs = remaining % 60
-                    farmEggLabel.Text = "🥚 Egg: " .. string.format("%02d:%02d", rm, rs) .. " sonra yenecek"
+                    farmEggLabel.Text = "🥚 Egg: " .. math.floor(remaining/60) .. "dk " .. (remaining%60) .. "sn"
                 end
             end)
             task.wait(1)
         end
     end)
     
-    -- Konumlari tekrar tara
+    -- Konumları tara
     findWeightPositions()
     
-    -- Ana farm döngüsü
+    -- ═══════════════════════════════════════════════════════
+    -- 🔥🔥🔥 TANRI HIZI REP SPAM SİSTEMİ 🔥🔥🔥
+    -- ═══════════════════════════════════════════════════════
+    local repSpamActive = false
+    
+    local function startGodRepSpam()
+        repSpamActive = true
+        
+        -- ═══ HEARTBEAT: Her frame 10 rep ═══
+        if farmRepConn then pcall(function() farmRepConn:Disconnect() end) end
+        farmRepConn = RunService.Heartbeat:Connect(function()
+            if not repSpamActive or not States.FarmActive then return end
+            pcall(function()
+                local e = LP:FindFirstChild("muscleEvent")
+                if e then
+                    for i = 1, 10 do
+                        e:FireServer("rep")
+                    end
+                end
+                -- RepTime sürekli sıfırla (her frame)
+                if Character then
+                    for _, tool in pairs(Character:GetChildren()) do
+                        if tool:IsA("Tool") then
+                            local rt = tool:FindFirstChild("repTime")
+                            if rt then rt.Value = 0 end
+                            local rc = tool:FindFirstChild("repCooldown")
+                            if rc then rc.Value = 0 end
+                            local lc = tool:FindFirstChild("liftCooldown")
+                            if lc then lc.Value = 0 end
+                        end
+                    end
+                end
+            end)
+        end)
+        
+        -- ═══ PARALEL LOOP 1: 25 rep / 0.01s ═══
+        spawn(function()
+            while repSpamActive and States.FarmActive do
+                pcall(function()
+                    local e = LP:FindFirstChild("muscleEvent")
+                    if e then
+                        for i = 1, 25 do e:FireServer("rep") end
+                    end
+                end)
+                task.wait(0.01)
+            end
+        end)
+        
+        -- ═══ PARALEL LOOP 2: 25 rep / 0.01s ═══
+        spawn(function()
+            while repSpamActive and States.FarmActive do
+                pcall(function()
+                    local e = LP:FindFirstChild("muscleEvent")
+                    if e then
+                        for i = 1, 25 do e:FireServer("rep") end
+                    end
+                end)
+                task.wait(0.01)
+            end
+        end)
+        
+        -- ═══ PARALEL LOOP 3: 20 rep / 0.02s ═══
+        spawn(function()
+            while repSpamActive and States.FarmActive do
+                pcall(function()
+                    local e = LP:FindFirstChild("muscleEvent")
+                    if e then
+                        for i = 1, 20 do e:FireServer("rep") end
+                    end
+                end)
+                task.wait(0.02)
+            end
+        end)
+        
+        -- ═══ PARALEL LOOP 4: 20 rep / 0.02s ═══
+        spawn(function()
+            while repSpamActive and States.FarmActive do
+                pcall(function()
+                    local e = LP:FindFirstChild("muscleEvent")
+                    if e then
+                        for i = 1, 20 do e:FireServer("rep") end
+                    end
+                end)
+                task.wait(0.02)
+            end
+        end)
+        
+        -- ═══ PARALEL LOOP 5: 15 rep / 0.03s ═══
+        spawn(function()
+            while repSpamActive and States.FarmActive do
+                pcall(function()
+                    local e = LP:FindFirstChild("muscleEvent")
+                    if e then
+                        for i = 1, 15 do e:FireServer("rep") end
+                    end
+                end)
+                task.wait(0.03)
+            end
+        end)
+        
+        -- ═══ SÜREKLI COOLDOWN BYPASS ═══
+        spawn(function()
+            while repSpamActive and States.FarmActive do
+                pcall(function()
+                    if Character then
+                        for _, tool in pairs(Character:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                local rt = tool:FindFirstChild("repTime")
+                                if rt then rt.Value = 0 end
+                                local rc = tool:FindFirstChild("repCooldown")
+                                if rc then rc.Value = 0 end
+                                local lc = tool:FindFirstChild("liftCooldown")
+                                if lc then lc.Value = 0 end
+                            end
+                        end
+                    end
+                    local bp = LP:FindFirstChild("Backpack")
+                    if bp then
+                        for _, tool in pairs(bp:GetChildren()) do
+                            if tool:IsA("Tool") then
+                                local rt = tool:FindFirstChild("repTime")
+                                if rt then rt.Value = 0 end
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.05)
+            end
+        end)
+    end
+    
+    local function stopGodRepSpam()
+        repSpamActive = false
+        if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
+    end
+    
+    -- ═══════════════════════════════════════════════════════
+    -- 🔄 ANA FARM DÖNGÜSÜ
+    -- ═══════════════════════════════════════════════════════
     spawn(function()
         while States.FarmActive do
-            pcall(function()
-                -- ADIM 1: Ağırlığın yanına ışınlan
-                farmStatusLabel.Text = "🟢 [1/5] " .. weightData.name .. " yanına ışınlanıyor..."
+            local ok, err = pcall(function()
+                
+                -- ══════ ADIM 1: IŞINLAN ══════
+                farmStatusLabel.Text = "⚡ [1] " .. weightData.name .. " yanına ışınlanıyor..."
                 
                 if weightData.pos and Character and Character:FindFirstChild("HumanoidRootPart") then
                     Character.HumanoidRootPart.CFrame = CFrame.new(weightData.pos)
-                    task.wait(0.3)
                 else
-                    -- Konum bulunamadıysa workspace'i tekrar tara
                     findWeightPositions()
                     if weightData.pos and Character and Character:FindFirstChild("HumanoidRootPart") then
                         Character.HumanoidRootPart.CFrame = CFrame.new(weightData.pos)
-                        task.wait(0.3)
                     end
                 end
-                
-                -- ADIM 2: E tuşuna bas (ağırlığı kullan)
-                farmStatusLabel.Text = "🟢 [2/5] E tuşuna basılıyor (ağırlık kullanılıyor)..."
-                pressE()
-                task.wait(0.3)
-                pressE() -- İkinci kez dene (güvenlik)
                 task.wait(0.2)
                 
-                -- ADIM 3: Swift Samurai petlerini tak (8 tane)
-                farmStatusLabel.Text = "🟢 [3/5] Swift Samurai petleri takılıyor (8x)..."
+                -- ══════ ADIM 2: E TUŞU (ağırlığı al) ══════
+                farmStatusLabel.Text = "⚡ [2] E tuşu - ağırlık alınıyor..."
+                pressE()
+                task.wait(0.2)
+                pressE()
+                task.wait(0.15)
+                
+                -- ══════ ADIM 3: SWIFT SAMURAI 8x TAK ══════
+                farmStatusLabel.Text = "⚡ [3] Swift Samurai 8x takılıyor..."
                 ultraFastPetSwap(States.FarmPetSwiftSamurai, States.FarmSwiftCount)
-                task.wait(0.1)
+                task.wait(0.05)
                 
                 -- Auto Lift aç
                 pcall(function()
@@ -1858,197 +1991,72 @@ local function startFarm()
                     if a then a.Value = true end
                 end)
                 
-                -- ADIM 4: ⚡ TANRI HIZI GÜÇ KASMA + ANLIK REBIRTH ⚡
-                farmStatusLabel.Text = "🟢 [4/5] ⚡ TANRI HIZI güç kasılıyor..."
+                -- ══════ ADIM 4: 🔥 TANRI HIZI GÜÇ KAS 🔥 ══════
+                farmStatusLabel.Text = "🔥 [4] TANRI HIZI güç kasılıyor..."
+                startGodRepSpam()
                 
-                -- ═══ SÜREKLI RepTime BYPASS LOOP (oyunu bozmadan en hızlı) ═══
-                local repTimeBypassConn = nil
-                repTimeBypassConn = spawn(function()
-                    while States.FarmActive do
-                        pcall(function()
-                            -- Character tool'ları
-                            if Character then
-                                for _, tool in pairs(Character:GetChildren()) do
-                                    if tool:IsA("Tool") then
-                                        local rt = tool:FindFirstChild("repTime")
-                                        if rt then rt.Value = 0 end
-                                        -- repCooldown, liftCooldown gibi değerleri de sıfırla
-                                        local rc = tool:FindFirstChild("repCooldown")
-                                        if rc then rc.Value = 0 end
-                                        local lc = tool:FindFirstChild("liftCooldown")
-                                        if lc then lc.Value = 0 end
-                                    end
-                                end
-                            end
-                            -- Backpack tool'ları
-                            local bp = LP:FindFirstChild("Backpack")
-                            if bp then
-                                for _, tool in pairs(bp:GetChildren()) do
-                                    if tool:IsA("Tool") then
-                                        local rt = tool:FindFirstChild("repTime")
-                                        if rt then rt.Value = 0 end
-                                        local rc = tool:FindFirstChild("repCooldown")
-                                        if rc then rc.Value = 0 end
-                                        local lc = tool:FindFirstChild("liftCooldown")
-                                        if lc then lc.Value = 0 end
-                                    end
-                                end
-                            end
-                        end)
-                        task.wait(0.08) -- Her 80ms'de cooldown sıfırla (lag yapmaz)
-                    end
-                end)
-                
-                -- ═══ ANA REP SPAM: Heartbeat (her frame 8 rep) ═══
-                if farmRepConn then pcall(function() farmRepConn:Disconnect() end) end
-                farmRepConn = RunService.Heartbeat:Connect(function()
-                    if not States.FarmActive then return end
-                    pcall(function()
-                        local e = LP:FindFirstChild("muscleEvent")
-                        if e then
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                            e:FireServer("rep")
-                        end
-                    end)
-                end)
-                
-                -- ═══ PARALEL REP SPAM LOOP 1 (20 rep / 0.02s) ═══
-                local farmRepLoop1 = true
-                spawn(function()
-                    while States.FarmActive and farmRepLoop1 do
-                        pcall(function()
-                            local e = LP:FindFirstChild("muscleEvent")
-                            if e then
-                                for i = 1, 20 do
-                                    e:FireServer("rep")
-                                end
-                            end
-                        end)
-                        task.wait(0.02)
-                    end
-                end)
-                
-                -- ═══ PARALEL REP SPAM LOOP 2 (15 rep / 0.03s) ═══
-                spawn(function()
-                    while States.FarmActive and farmRepLoop1 do
-                        pcall(function()
-                            local e = LP:FindFirstChild("muscleEvent")
-                            if e then
-                                for i = 1, 15 do
-                                    e:FireServer("rep")
-                                end
-                            end
-                        end)
-                        task.wait(0.03)
-                    end
-                end)
-                
-                -- ═══ PARALEL REP SPAM LOOP 3 (15 rep / 0.03s - ek katman) ═══
-                spawn(function()
-                    while States.FarmActive and farmRepLoop1 do
-                        pcall(function()
-                            local e = LP:FindFirstChild("muscleEvent")
-                            if e then
-                                for i = 1, 15 do
-                                    e:FireServer("rep")
-                                end
-                            end
-                        end)
-                        task.wait(0.03)
-                    end
-                end)
-                
-                -- ═══ REBIRTH KONTROL DÖNGÜSÜ (0.08s aralık - anında yakalama) ═══
-                local rebirthDone = false
+                -- Rebirth kontrolü döngüsü
                 local lastStatUpdate = 0
-                while States.FarmActive and not rebirthDone do
+                while States.FarmActive do
                     local now = tick()
-                    local str = getCurrentStrength()
-                    local req = getRebirthRequirement()
-                    local rb = getRebirthCount()
                     
-                    -- İstatistikleri her 0.5 saniyede güncelle (lag önleme)
+                    -- İstatistikleri 0.5s'de bir güncelle
                     if (now - lastStatUpdate) >= 0.5 then
                         lastStatUpdate = now
+                        local str = getCurrentStrength()
+                        local req = getRebirthRequirement()
+                        local rb = getRebirthCount()
                         
-                        -- Guc hizi hesapla
                         local elapsed = now - farmStartTime
                         if elapsed > 1 then
                             farmPowerPerSecond = (str - farmStartStrength) / elapsed
                         end
-                        local perMin = farmPowerPerSecond * 60
-                        local perHour = farmPowerPerSecond * 3600
-                        local perDay = farmPowerPerSecond * 86400
-                        local perWeek = farmPowerPerSecond * 604800
                         
-                        -- Rebirth hizi hesapla
                         local rbElapsed = now - farmRebirthStartTime
                         local rbDoneCount = rb - farmRebirthStartCount
                         if rbElapsed > 1 and rbDoneCount > 0 then
                             farmRebirthPerSecond = rbDoneCount / rbElapsed
                         end
-                        local rbPerMin = farmRebirthPerSecond * 60
-                        local rbPerHour = farmRebirthPerSecond * 3600
-                        local rbPerDay = farmRebirthPerSecond * 86400
-                        local rbPerWeek = farmRebirthPerSecond * 604800
                         
                         pcall(function()
-                            farmStatusLabel.Text = "⚡ [4/5] Güç: " .. formatNumber(str) .. " / " .. (req > 0 and formatNumber(req) or "?") .. "\nRebirth: " .. tostring(rb)
+                            farmStatusLabel.Text = "🔥 Güç: " .. formatNumber(str) .. " / " .. (req > 0 and formatNumber(req) or "?") .. " | Rebirth: " .. tostring(rb)
                             farmRebirthLabel.Text = "🔄 Rebirth: " .. tostring(rb)
                             farmSpeedLabel.Text = "📊 Güç Hızı:\n" ..
-                                "  ⏱ Dakikada: " .. formatNumber(perMin) .. "\n" ..
-                                "  ⏰ Saatte: " .. formatNumber(perHour) .. "\n" ..
-                                "  📅 Günde: " .. formatNumber(perDay) .. "\n" ..
-                                "  📆 Haftada: " .. formatNumber(perWeek)
+                                "  ⏱ Dakikada: " .. formatNumber(farmPowerPerSecond * 60) .. "\n" ..
+                                "  ⏰ Saatte: " .. formatNumber(farmPowerPerSecond * 3600) .. "\n" ..
+                                "  📅 Günde: " .. formatNumber(farmPowerPerSecond * 86400) .. "\n" ..
+                                "  📆 Haftada: " .. formatNumber(farmPowerPerSecond * 604800)
                             farmRebirthSpeedLabel.Text = "⚡ Rebirth Hızı:\n" ..
-                                "  ⏱ Dakikada: " .. string.format("%.1f", rbPerMin) .. "\n" ..
-                                "  ⏰ Saatte: " .. string.format("%.0f", rbPerHour) .. "\n" ..
-                                "  📅 Günde: " .. string.format("%.0f", rbPerDay) .. "\n" ..
-                                "  📆 Haftada: " .. string.format("%.0f", rbPerWeek)
+                                "  ⏱ Dakikada: " .. string.format("%.1f", farmRebirthPerSecond * 60) .. "\n" ..
+                                "  ⏰ Saatte: " .. string.format("%.0f", farmRebirthPerSecond * 3600) .. "\n" ..
+                                "  📅 Günde: " .. string.format("%.0f", farmRebirthPerSecond * 86400) .. "\n" ..
+                                "  📆 Haftada: " .. string.format("%.0f", farmRebirthPerSecond * 604800)
                         end)
                         
-                        -- Auto Protein Egg (30 dakikada 1) - Sadece toggle açıksa ye
+                        -- Protein Egg
                         if States.AutoProteinEgg then
                             pcall(function()
-                                local eggResult = eatOneEgg()
-                                if eggResult then
-                                    farmEggLabel.Text = "🥚 Egg: Protein Egg Yendi! ✅"
-                                    game:GetService("StarterGui"):SetCore("SendNotification", {
-                                        Title = "🥚 Protein Egg",
-                                        Text = "Protein Egg yendi! Sonraki: 30 dk sonra",
-                                        Duration = 3
-                                    })
+                                if eatOneEgg() then
+                                    farmEggLabel.Text = "🥚 Egg: Yendi! ✅"
                                 end
                             end)
-                        else
-                            farmEggLabel.Text = "🥚 Egg: Kapalı (toggle açın)"
                         end
                     end
                     
-                    -- ═══ ANLIK REBIRTH KONTROLÜ ═══
+                    -- ══════ REBİRTH KONTROLÜ ══════
                     if canRebirth() then
-                        -- Paralel rep loop'ları durdur
-                        farmRepLoop1 = false
+                        -- 1) Rep spam DURDUR
+                        stopGodRepSpam()
                         
-                        farmStatusLabel.Text = "🟡 REBIRTH! Pet değiştiriliyor..."
-                        
-                        -- Rep spam durdur (Heartbeat)
-                        if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
-                        
-                        -- Tribal Overlord petlerini tak (ULTRA HIZLI)
+                        -- 2) Tribal Overlord 8x TAK
+                        farmStatusLabel.Text = "🟡 REBIRTH! Tribal Overlord 8x takılıyor..."
                         ultraFastPetSwap(States.FarmPetTribalOverlord, States.FarmTribalCount)
                         task.wait(0.02)
                         
-                        -- ANLIK REBIRTH (animasyonsuz, 10 deneme art arda)
+                        -- 3) ANLIK REBIRTH (animasyonsuz)
                         farmStatusLabel.Text = "🟡 FAST REBIRTH ATILIYOR!"
                         
-                        -- Rebirth animasyon GUI'lerini engelle + yok et
+                        -- Animasyon GUI'lerini yok et
                         pcall(function()
                             local pg = LP:FindFirstChild("PlayerGui")
                             if pg then
@@ -2063,13 +2071,13 @@ local function startFarm()
                             end
                         end)
                         
-                        -- 10 rebirth denemesi art arda (en az biri tutar)
-                        for attempt = 1, 10 do
+                        -- 15 rebirth denemesi (en az biri tutar)
+                        for attempt = 1, 15 do
                             doRebirth()
-                            task.wait(0.01)
                         end
+                        task.wait(0.02)
                         
-                        -- Animasyon kalıntılarını temizle
+                        -- Animasyon kalıntıları temizle
                         pcall(function()
                             local pg = LP:FindFirstChild("PlayerGui")
                             if pg then
@@ -2084,14 +2092,7 @@ local function startFarm()
                             end
                         end)
                         
-                        task.wait(0.02)
-                        
-                        -- Swift Samurai geri tak (ultra hızlı)
-                        farmStatusLabel.Text = "🟢 Swift Samurai geri takılıyor..."
-                        ultraFastPetSwap(States.FarmPetSwiftSamurai, States.FarmSwiftCount)
-                        task.wait(0.02)
-                        
-                        -- Güç hızı takibini sıfırla
+                        -- 4) Güç takibini sıfırla
                         farmStartTime = tick()
                         farmStartStrength = getCurrentStrength()
                         farmPowerPerSecond = 0
@@ -2101,21 +2102,27 @@ local function startFarm()
                             farmRebirthLabel.Text = "🔄 Rebirth: " .. tostring(newRb)
                         end)
                         
-                        rebirthDone = true
+                        -- 5) Döngüyü kır → başa dön (Swift Samurai takılacak, rep spam başlayacak)
+                        break
                     end
                     
-                    task.wait(0.08) -- 80ms aralık: rebirth anını kaçırmaz + lag yapmaz
+                    task.wait(0.05) -- 50ms: rebirth anını kaçırmaz
                 end
                 
-                -- Rep spam durdur (rebirth sonrası)
-                if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
+                -- Rep spam temizle (döngü dışında)
+                stopGodRepSpam()
+                task.wait(0.02)
                 
-                -- Hemen tekrarla (bekleme yok)
-                task.wait(0.05)
             end)
+            
+            if not ok then
+                warn("[Farm Error] " .. tostring(err))
+                task.wait(0.5)
+            end
         end
         
-        -- Farm durduğunda temizlik
+        -- Farm tamamen durduğunda temizlik
+        stopGodRepSpam()
         stopFarm()
     end)
 end
@@ -2136,65 +2143,85 @@ end)
 
 addSection(Pages.Farm, "Ek Farm Özellikleri")
 
--- 🏋 Auto Lift Gamepass Toggle
+-- 🏋 Auto Lift Gamepass Toggle (BYPASS - Bedava Çalışır)
 States.AutoLiftGamepass = false
 local autoLiftGPConn = nil
+local autoLiftGPHooked = false
 
-addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Aktive Et)", false, function(v)
+addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Bedava Aç)", false, function(v)
     States.AutoLiftGamepass = v
     if v then
-        -- YÖNTEM 1: autoLiftEnabled değerini aç
+        -- ═══════════════════════════════════════════════════
+        -- GAMEPASS BYPASS: Sahiplik kontrolünü atla
+        -- ═══════════════════════════════════════════════════
+        
+        -- BYPASS 1: Oyuncunun gamepass sahiplik değerlerini true yap
         pcall(function()
+            -- autoLiftEnabled değerini oluştur veya true yap
             local a = LP:FindFirstChild("autoLiftEnabled")
-            if a then a.Value = true end
-        end)
-        
-        -- YÖNTEM 2: muscleEvent ile autoLift aktive et
-        pcall(function()
-            local e = LP:FindFirstChild("muscleEvent")
-            if e then
-                e:FireServer("activateAutoLift")
-                e:FireServer("autoLift")
-                e:FireServer("useGamepass", "Auto Lift")
-                e:FireServer("gamepassActivate", "Auto Lift")
+            if a then 
+                a.Value = true 
+            else
+                -- Değer yoksa oluştur
+                local newVal = Instance.new("BoolValue")
+                newVal.Name = "autoLiftEnabled"
+                newVal.Value = true
+                newVal.Parent = LP
             end
-        end)
-        
-        -- YÖNTEM 3: rEvents üzerinden dene
-        pcall(function()
-            local rEvents = RS:FindFirstChild("rEvents")
-            if rEvents then
-                -- autoLift remote'u
-                local autoLiftRemote = rEvents:FindFirstChild("autoLiftEvent") 
-                    or rEvents:FindFirstChild("autoLiftRemote")
-                    or rEvents:FindFirstChild("activateAutoLift")
-                if autoLiftRemote then
-                    if autoLiftRemote:IsA("RemoteEvent") then
-                        autoLiftRemote:FireServer()
-                    elseif autoLiftRemote:IsA("RemoteFunction") then
-                        autoLiftRemote:InvokeServer()
+            
+            -- autoLiftOwned / hasAutoLift gibi değerleri de true yap
+            local possibleNames = {"autoLiftOwned", "hasAutoLift", "autoLift", "ownAutoLift", "autoLiftGamepass"}
+            for _, name in ipairs(possibleNames) do
+                local val = LP:FindFirstChild(name)
+                if val then
+                    pcall(function() val.Value = true end)
+                end
+            end
+            
+            -- hiddenStats içinde aynı kontrol
+            local hs = LP:FindFirstChild("hiddenStats")
+            if hs then
+                for _, name in ipairs(possibleNames) do
+                    local val = hs:FindFirstChild(name)
+                    if val then
+                        pcall(function() val.Value = true end)
                     end
                 end
-                
-                -- gamepass remote'u
-                local gpRemote = rEvents:FindFirstChild("gamepassEvent")
-                    or rEvents:FindFirstChild("useGamepassEvent")
-                    or rEvents:FindFirstChild("purchaseHandler")
-                if gpRemote then
-                    pcall(function()
-                        if gpRemote:IsA("RemoteEvent") then
-                            gpRemote:FireServer("Auto Lift")
-                            gpRemote:FireServer("autoLift")
-                        elseif gpRemote:IsA("RemoteFunction") then
-                            gpRemote:InvokeServer("Auto Lift")
-                            gpRemote:InvokeServer("autoLift")
-                        end
-                    end)
-                end
+                local al = hs:FindFirstChild("autoLiftEnabled")
+                if al then al.Value = true end
             end
         end)
         
-        -- YÖNTEM 4: PlayerGui'deki Auto Lift butonunu simüle et
+        -- BYPASS 2: MarketplaceService Hook (gamepass sahiplik kontrolünü bypass)
+        if not autoLiftGPHooked then
+            pcall(function()
+                local MPS = game:GetService("MarketplaceService")
+                local originalOwns = MPS.UserOwnsGamePassAsync
+                
+                -- Hook: Auto Lift gamepass ID'leri için true dön
+                if hookfunction then
+                    local old
+                    old = hookfunction(MPS.UserOwnsGamePassAsync, function(self, userId, gamePassId)
+                        -- Auto Lift gamepass kontrolü gelirse true dön
+                        if States.AutoLiftGamepass then
+                            return true
+                        end
+                        return old(self, userId, gamePassId)
+                    end)
+                    autoLiftGPHooked = true
+                elseif newcclosure and hookfunction then
+                    hookfunction(MPS.UserOwnsGamePassAsync, newcclosure(function(self, userId, gamePassId)
+                        if States.AutoLiftGamepass then
+                            return true
+                        end
+                        return originalOwns(self, userId, gamePassId)
+                    end))
+                    autoLiftGPHooked = true
+                end
+            end)
+        end
+        
+        -- BYPASS 3: Oyundaki Auto Lift butonunu bul ve programatik tıkla
         pcall(function()
             local pg = LP:FindFirstChild("PlayerGui")
             if pg then
@@ -2202,12 +2229,35 @@ addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Aktive Et)", false, function(v)
                     pcall(function()
                         if gui:IsA("TextButton") or gui:IsA("ImageButton") then
                             local n = gui.Name:lower()
-                            if n:find("autolift") or n:find("auto_lift") or n:find("autolifttoggle") then
-                                -- Butonu aktive et
+                            local parentName = gui.Parent and gui.Parent.Name:lower() or ""
+                            -- Auto Lift butonu bul
+                            if n:find("autolift") or n:find("auto_lift") or n:find("autolifttoggle")
+                               or parentName:find("autolift") or parentName:find("auto_lift") then
+                                -- Butona programatik tıkla (fireclick)
                                 pcall(function()
-                                    if gui:IsA("TextButton") then
-                                        gui.Text = "ON"
+                                    if fireclickdetector then
+                                        fireclickdetector(gui)
                                     end
+                                end)
+                                pcall(function()
+                                    -- MouseButton1Click sinyalini tetikle
+                                    gui.MouseButton1Click:Fire()
+                                end)
+                                -- Firesignal yöntemi (executor desteği varsa)
+                                pcall(function()
+                                    if firesignal then
+                                        firesignal(gui.MouseButton1Click)
+                                    end
+                                end)
+                            end
+                        end
+                        -- "auto lift" yazılı Image butonları
+                        if gui:IsA("ImageButton") then
+                            local img = gui.Image:lower()
+                            if img:find("autolift") or img:find("auto_lift") then
+                                pcall(function() gui.MouseButton1Click:Fire() end)
+                                pcall(function()
+                                    if firesignal then firesignal(gui.MouseButton1Click) end
                                 end)
                             end
                         end
@@ -2216,19 +2266,63 @@ addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Aktive Et)", false, function(v)
             end
         end)
         
-        -- Sürekli autoLiftEnabled true tut (loop)
+        -- BYPASS 4: muscleEvent ile autoLift aktive et
+        pcall(function()
+            local e = LP:FindFirstChild("muscleEvent")
+            if e then
+                e:FireServer("activateAutoLift")
+                e:FireServer("autoLift")
+                e:FireServer("useGamepass", "Auto Lift")
+                e:FireServer("gamepassActivate", "Auto Lift")
+                e:FireServer("toggleAutoLift")
+                e:FireServer("setAutoLift", true)
+            end
+        end)
+        
+        -- BYPASS 5: rEvents üzerinden aktive et
+        pcall(function()
+            local rEvents = RS:FindFirstChild("rEvents")
+            if rEvents then
+                for _, remote in pairs(rEvents:GetChildren()) do
+                    local rn = remote.Name:lower()
+                    if rn:find("autolift") or rn:find("auto_lift") or rn:find("gamepass") then
+                        pcall(function()
+                            if remote:IsA("RemoteEvent") then
+                                remote:FireServer("autoLift")
+                                remote:FireServer("Auto Lift")
+                                remote:FireServer(true)
+                            elseif remote:IsA("RemoteFunction") then
+                                remote:InvokeServer("autoLift")
+                                remote:InvokeServer("Auto Lift")
+                                remote:InvokeServer(true)
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+        
+        -- ═══ Sürekli aktif tut (Heartbeat loop) ═══
         if autoLiftGPConn then pcall(function() autoLiftGPConn:Disconnect() end) end
         autoLiftGPConn = RunService.Heartbeat:Connect(function()
             if not States.AutoLiftGamepass then return end
             pcall(function()
+                -- autoLiftEnabled sürekli true
                 local a = LP:FindFirstChild("autoLiftEnabled")
                 if a then a.Value = true end
+                
+                -- hiddenStats içindeki değer de true
+                local hs = LP:FindFirstChild("hiddenStats")
+                if hs then
+                    local al = hs:FindFirstChild("autoLiftEnabled")
+                    if al then al.Value = true end
+                end
             end)
         end)
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "🏋 Auto Lift",
-            Text = "Auto Lift Gamepass aktive edildi! Otomatik ağırlık kaldırma açık.",
+            Text = "Auto Lift BYPASS aktive edildi! Bedava çalışıyor ✅",
             Duration = 4
         })
     else
