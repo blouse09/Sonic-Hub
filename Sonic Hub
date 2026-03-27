@@ -1803,18 +1803,22 @@ local function startFarm()
                             "  📆 Haftada: " .. string.format("%.0f", rbPerWeek)
                     end)
                     
-                    -- Auto Protein Egg (30 dakikada 1)
-                    pcall(function()
-                        local eggResult = eatOneEgg()
-                        if eggResult then
-                            farmEggLabel.Text = "🥚 Egg: Yendi! ✅"
-                            game:GetService("StarterGui"):SetCore("SendNotification", {
-                                Title = "🥚 Protein Egg",
-                                Text = "1 yumurta yendi! Sonraki: 30 dk sonra",
-                                Duration = 3
-                            })
-                        end
-                    end)
+                    -- Auto Protein Egg (30 dakikada 1) - Sadece toggle açıksa ye
+                    if States.AutoProteinEgg then
+                        pcall(function()
+                            local eggResult = eatOneEgg()
+                            if eggResult then
+                                farmEggLabel.Text = "🥚 Egg: Protein Egg Yendi! ✅"
+                                game:GetService("StarterGui"):SetCore("SendNotification", {
+                                    Title = "🥚 Protein Egg",
+                                    Text = "Protein Egg yendi! Sonraki: 30 dk sonra",
+                                    Duration = 3
+                                })
+                            end
+                        end)
+                    else
+                        farmEggLabel.Text = "🥚 Egg: Kapalı (toggle açın)"
+                    end
                     
                     -- Rebirth yapilabilir mi kontrol et
                     if canRebirth() then
@@ -1916,6 +1920,27 @@ addToggle(Pages.Farm, "🚀 START FARM (Başlat/Durdur)", false, function(v)
 end)
 
 addSection(Pages.Farm, "Ek Farm Özellikleri")
+
+-- 🥚 Auto Protein Egg Toggle (isteğe bağlı)
+addToggle(Pages.Farm, "🥚 Auto Protein Egg (30dk/1 yumurta)", false, function(v)
+    States.AutoProteinEgg = v
+    if v then
+        lastEggTime = 0 -- İlk egg hemen yenebilir
+        farmEggLabel.Text = "🥚 Egg: Açık - İlk yumurta yenecek..."
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🥚 Protein Egg",
+            Text = "Auto Protein Egg açıldı! Sadece Protein Egg yenir (30dk/1).",
+            Duration = 4
+        })
+    else
+        farmEggLabel.Text = "🥚 Egg: Kapalı"
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "🥚 Protein Egg",
+            Text = "Auto Protein Egg kapatıldı.",
+            Duration = 3
+        })
+    end
+end)
 
 -- ======================================================
 -- ESKİ FARM ÖZELLİKLERİ (Other Tab'a taşındı)
