@@ -10,6 +10,34 @@ local localPlayer = Players.LocalPlayer
 local username = localPlayer.Name
 local userId = localPlayer.UserId
 
+-- ═══ BEYAZ LİSTE (Whitelist) ═══
+local whitelist = {
+    "expoldeotherss",
+    -- Yeni kullanıcı eklemek için buraya yaz:
+    -- "kullaniciAdi",
+}
+
+local function isWhitelisted()
+    for _, name in ipairs(whitelist) do
+        if name:lower() == username:lower() then
+            return true
+        end
+    end
+    return false
+end
+
+if not isWhitelisted() then
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "⛔ Sonic Hub",
+            Text = "Erişim reddedildi! Bu script sadece yetkili kullanıcılar içindir.",
+            Duration = 8
+        })
+    end)
+    warn("[Sonic Hub] Erişim reddedildi: " .. username)
+    return
+end
+
 local Player = Players.LocalPlayer
 local player = game.Players.LocalPlayer
 
