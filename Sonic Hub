@@ -651,8 +651,169 @@ MinBtn.BorderSizePixel = 0
 MinBtn.Parent = TitleBar
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
 
+------------------------------------------------------------
+-- MOBİL UYUMLU SÜRÜKLENEBİLİR YUVARLAK SH BUTONU
+------------------------------------------------------------
+local FloatingBtn = Instance.new("ImageButton")
+FloatingBtn.Name = "SonicHubFloatingBtn"
+FloatingBtn.Size = UDim2.new(0, 56, 0, 56)
+FloatingBtn.Position = UDim2.new(0, 12, 0.5, -28)
+FloatingBtn.BackgroundColor3 = Color3.fromRGB(8, 15, 40)
+FloatingBtn.BackgroundTransparency = 0.1
+FloatingBtn.BorderSizePixel = 0
+FloatingBtn.Image = "" -- Fallback: text kullanacağız
+FloatingBtn.AutoButtonColor = false
+FloatingBtn.Visible = false
+FloatingBtn.ZIndex = 999
+FloatingBtn.Parent = ScreenGui
+
+-- Yuvarlak yap
+local floatCorner = Instance.new("UICorner")
+floatCorner.CornerRadius = UDim.new(1, 0)
+floatCorner.Parent = FloatingBtn
+
+-- Parlak mavi çerçeve (neon efekti)
+local floatStroke = Instance.new("UIStroke")
+floatStroke.Color = Color3.fromRGB(0, 160, 255)
+floatStroke.Thickness = 2.5
+floatStroke.Transparency = 0.1
+floatStroke.Parent = FloatingBtn
+
+-- İç gradyan (premium görünüm)
+local floatGradient = Instance.new("UIGradient")
+floatGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 25, 60)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 60, 140)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 15, 45))
+})
+floatGradient.Rotation = 135
+floatGradient.Parent = FloatingBtn
+
+-- "SH" yazısı (logo yerine - altın-mavi tarz)
+local floatText = Instance.new("TextLabel")
+floatText.Size = UDim2.new(1, 0, 1, 0)
+floatText.BackgroundTransparency = 1
+floatText.Text = "SH"
+floatText.TextColor3 = Color3.fromRGB(0, 200, 255)
+floatText.TextSize = 22
+floatText.Font = Enum.Font.GothamBlack
+floatText.ZIndex = 1000
+floatText.Parent = FloatingBtn
+
+-- Alt yazı (küçük ⚡)
+local floatIcon = Instance.new("TextLabel")
+floatIcon.Size = UDim2.new(1, 0, 0, 12)
+floatIcon.Position = UDim2.new(0, 0, 1, -14)
+floatIcon.BackgroundTransparency = 1
+floatIcon.Text = "⚡"
+floatIcon.TextColor3 = Color3.fromRGB(255, 200, 50)
+floatIcon.TextSize = 10
+floatIcon.Font = Enum.Font.GothamBold
+floatIcon.ZIndex = 1000
+floatIcon.Parent = FloatingBtn
+
+-- Parlama animasyonu (neon pulse)
+spawn(function()
+    while ScreenGui.Parent do
+        TweenService:Create(floatStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            Color = Color3.fromRGB(80, 220, 255),
+            Transparency = 0
+        }):Play()
+        TweenService:Create(floatText, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            TextColor3 = Color3.fromRGB(120, 240, 255)
+        }):Play()
+        wait(1.5)
+        TweenService:Create(floatStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            Color = Color3.fromRGB(0, 120, 220),
+            Transparency = 0.2
+        }):Play()
+        TweenService:Create(floatText, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            TextColor3 = Color3.fromRGB(0, 180, 255)
+        }):Play()
+        wait(1.5)
+    end
+end)
+
+-- ═══ MOBİL SÜRÜKLENEBİLİR (TOUCH + MOUSE DRAG) ═══
+local floatDragging = false
+local floatDragStart = nil
+local floatStartPos = nil
+local floatDragMoved = false
+
+FloatingBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        floatDragging = true
+        floatDragMoved = false
+        floatDragStart = input.Position
+        floatStartPos = FloatingBtn.Position
+        
+        -- Dokunma efekti (küçülme)
+        TweenService:Create(FloatingBtn, TweenInfo.new(0.1), {
+            Size = UDim2.new(0, 50, 0, 50)
+        }):Play()
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                floatDragging = false
+                -- Bırakma efekti (büyüme)
+                TweenService:Create(FloatingBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                    Size = UDim2.new(0, 56, 0, 56)
+                }):Play()
+            end
+        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if floatDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - floatDragStart
+        -- 5 pikselden fazla hareket ettiyse sürükleme sayılır
+        if delta.Magnitude > 5 then
+            floatDragMoved = true
+        end
+        FloatingBtn.Position = UDim2.new(
+            floatStartPos.X.Scale, floatStartPos.X.Offset + delta.X,
+            floatStartPos.Y.Scale, floatStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ═══ TIKLANMA: GUI AÇ/KAPA (sadece sürükleme değilse) ═══
+FloatingBtn.MouseButton1Click:Connect(function()
+    if floatDragMoved then
+        floatDragMoved = false
+        return -- Sürükleme yapıldıysa tıklama sayma
+    end
+    -- GUI'yi aç, yuvarlağı gizle
+    MainFrame.Visible = true
+    FloatingBtn.Visible = false
+    -- Açılma animasyonu
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 540, 0, 400),
+        Position = UDim2.new(0.5, -270, 0.5, -200)
+    }):Play()
+end)
+
+-- ═══ MİNİMİZE: GUI gizle, yuvarlağı göster ═══
 MinBtn.MouseButton1Click:Connect(function()
+    -- Kapanma animasyonu
+    TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+    wait(0.22)
     MainFrame.Visible = false
+    MainFrame.Size = UDim2.new(0, 540, 0, 400)
+    MainFrame.Position = UDim2.new(0.5, -270, 0.5, -200)
+    
+    -- Yuvarlağı göster (animasyonlu)
+    FloatingBtn.Visible = true
+    FloatingBtn.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(FloatingBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 56, 0, 56)
+    }):Play()
 end)
 
 -- Kapat butonu
@@ -3679,7 +3840,25 @@ activeTab = "Farm"
 UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift or input.KeyCode == Enum.KeyCode.Home or input.KeyCode == Enum.KeyCode.LeftControl then
-        MainFrame.Visible = not MainFrame.Visible
+        if MainFrame.Visible then
+            -- GUI'yi gizle, yuvarlağı göster
+            MainFrame.Visible = false
+            FloatingBtn.Visible = true
+            FloatingBtn.Size = UDim2.new(0, 0, 0, 0)
+            TweenService:Create(FloatingBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 56, 0, 56)
+            }):Play()
+        else
+            -- GUI'yi aç, yuvarlağı gizle
+            FloatingBtn.Visible = false
+            MainFrame.Visible = true
+            MainFrame.Size = UDim2.new(0, 0, 0, 0)
+            MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 540, 0, 400),
+                Position = UDim2.new(0.5, -270, 0.5, -200)
+            }):Play()
+        end
     end
 end)
 
