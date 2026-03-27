@@ -63,6 +63,7 @@ local Window = Rayfield:CreateWindow({
     Name = "Sonic Hub | Paid",
     LoadingTitle = "Sonic Hub",
     LoadingSubtitle = "Muscle Legends Hub",
+    IntroEnabled = false,
     Theme = "Ocean",
     ConfigurationSaving = {
         Enabled = false,
