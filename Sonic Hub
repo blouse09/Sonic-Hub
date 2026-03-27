@@ -3,23 +3,7 @@ local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
 local localPlayer = Players.LocalPlayer
-local username = localPlayer.Name
-local userId = localPlayer.UserId
-
-local Player = Players.LocalPlayer
-local player = game.Players.LocalPlayer
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local muscleEvent = player:WaitForChild("muscleEvent")
-local leaderstats = player:WaitForChild("leaderstats")
-local rebirthsStat = leaderstats:WaitForChild("Rebirths")
-
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Byhalis/Gui-v8/main/V4%20gui.txt"))()
-
-local window = library:AddWindow("SonicHub  | Paid", {
-    main_color = Color3.fromRGB(0, 0,0),
-    min_size = Vector2.new(600, 600),
-    can_resize = false
+l
 })
 
 local replicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,7 +21,23 @@ for _, name in ipairs(blockedFrames) do
 end
 
 replicatedStorage.ChildAdded:Connect(function(child)
-    if table.find(blockedFrames, child.Name) and child:IsA("GuiObject") then
+    if table.find(blockedFrames, child.Name) and chiocal username = localPlayer.Name
+local userId = localPlayer.UserId
+
+local Player = Players.LocalPlayer
+local player = game.Players.LocalPlayer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local muscleEvent = player:WaitForChild("muscleEvent")
+local leaderstats = player:WaitForChild("leaderstats")
+local rebirthsStat = leaderstats:WaitForChild("Rebirths")
+
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Byhalis/Gui-v8/main/V4%20gui.txt"))()
+
+local window = library:AddWindow("Sonic Hub  | Paid", {
+    main_color = Color3.fromRGB(0, 0,0),
+    min_size = Vector2.new(600, 600),
+    can_resize = falseld:IsA("GuiObject") then
         child.Visible = false
     end
 end)
@@ -262,7 +262,7 @@ local sizeSwitch = FastRebTab:AddSwitch("Set Size 1", function(bool)
         thread = coroutine.create(function()
             while running do
                 game:GetService("ReplicatedStorage").rEvents.changeSpeedSizeRemote:InvokeServer("changeSize", 1)
-                wait(0.01)
+                task.wait(0.01)
             end
         end)
         coroutine.resume(thread)
@@ -307,7 +307,7 @@ FastRebTab:AddButton("Anti Lag", function()
 
         task.spawn(function()
             while true do
-                wait(5)
+                task.wait(5)
                 if not lighting:FindFirstChild("DarkSky") then
                     darkSky:Clone().Parent = lighting
                 end
@@ -363,7 +363,7 @@ local lockSwitch = FastRebTab:AddSwitch("Lock Position", function(state)
                 hrp.Velocity = Vector3.new(0, 0, 0)
                 hrp.RotVelocity = Vector3.new(0, 0, 0)
                 hrp.CFrame = CFrame.new(lockPosition)
-                wait(0.05) 
+                task.wait(0.05) 
             end
         end)
 
@@ -403,8 +403,8 @@ local spinwheelSwitch = FastRebTab:AddSwitch("Spin Fortune Wheel", function(bool
     _G.AutoSpinWheel = bool
     
     if bool then
-        spawn(function()
-            while _G.AutoSpinWheel and wait(1) do
+        task.spawn(function()
+            while _G.AutoSpinWheel and task.wait(1) do
                 game:GetService("ReplicatedStorage").rEvents.openFortuneWheelRemote:InvokeServer("openFortuneWheel", game:GetService("ReplicatedStorage").fortuneWheelChances["Fortune Wheel"])
             end
         end)
@@ -413,13 +413,15 @@ end)
 
 FastRebTab:AddButton("Jungle Lift",function()
     local player = game.Players.LocalPlayer
-    local char = player.Character or Player.CharacterAdded:wait()
+    local char = player.Character or player.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
     hrp.CFrame = CFrame.new(-8642.396484375, 6.7980651855, 2086.1030273)
     task.wait(0.2)
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.05)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
 end)
 
 
@@ -710,8 +712,8 @@ local spinwheelSwitch = FarmingTab:AddSwitch("Spin Fortune Wheel", function(bool
     _G.AutoSpinWheel = bool
     
     if bool then
-        spawn(function()
-            while _G.AutoSpinWheel and wait(1) do
+        task.spawn(function()
+            while _G.AutoSpinWheel and task.wait(1) do
                 game:GetService("ReplicatedStorage").rEvents.openFortuneWheelRemote:InvokeServer("openFortuneWheel", game:GetService("ReplicatedStorage").fortuneWheelChances["Fortune Wheel"])
             end
         end)
@@ -720,13 +722,15 @@ end)
 
 FarmingTab:AddButton("Jungle Squat",function()
     local player = game.Players.LocalPlayer
-    local char = player.Character or Player.CharacterAdded:wait()
+    local char = player.Character or player.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
     hrp.CFrame = CFrame.new(-8371.43359375, 6.79806327, 2858.88525390)
     task.wait(0.2)
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.05)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
 end)
 
 FarmingTab:AddButton("Anti Lag", function()
@@ -767,7 +771,7 @@ FarmingTab:AddButton("Anti Lag", function()
 
         task.spawn(function()
             while true do
-                wait(5)
+                task.wait(5)
                 if not lighting:FindFirstChild("DarkSky") then
                     darkSky:Clone().Parent = lighting
                 end
