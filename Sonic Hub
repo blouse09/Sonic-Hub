@@ -1204,37 +1204,59 @@ local farmMainConn = nil
 local farmRepConn = nil
 local farmLockConn = nil
 
+-- ═══ GLOBAL FARM KILL SWITCH ═══
+local farmSessionId = 0 -- Her farm başlatıldığında artar, eski loop'lar ölür
+local globalRepSpamActive = false -- Tüm rep spam loop'larının GLOBAL anahtarı
+local fastFarmSessionId = 0 -- Fast Farm için ayrı session
+
 ------------------------------------------------------------
 -- AGIRLIK KONUMLARI (Workspace'ten bulunacak)
 ------------------------------------------------------------
 local weightLocations = {
-    JungleBarLift = {name = "Jungle Bar Lift", pos = nil, searchNames = {"JungleBarLift", "Jungle Bar Lift", "jungleBarLift", "BarLift"}},
-    JungleSquat = {name = "Jungle Squat (En Büyüğü)", pos = nil, searchNames = {"JungleSquat", "Jungle Squat", "jungleSquat", "Squat"}}
+    JungleBarLift = {name = "Jungle Bar Lift", pos = nil, searchNames = {"JungleBarLift", "Jungle Bar Lift", "jungleBarLift"}},
+    JungleSquat = {name = "Jungle Squat (En Büyüğü)", pos = nil, searchNames = {"JungleSquat", "Jungle Squat", "jungleSquat"}}
 }
 
--- Workspace'ten ağırlık konumlarını bul
+-- Workspace'ten ağırlık konumlarını bul (EN BÜYÜĞÜ seç)
 local function findWeightPositions()
     pcall(function()
         for key, data in pairs(weightLocations) do
+            data.pos = nil
+            local bestPos = nil
+            local bestY = -math.huge -- En yüksek Y = en büyük ağırlık
+            
             for _, obj in pairs(workspace:GetDescendants()) do
                 pcall(function()
                     if obj:IsA("BasePart") or obj:IsA("Model") then
-                        for _, sName in ipairs(data.searchNames) do
-                            if obj.Name:lower():find(sName:lower()) then
-                                if obj:IsA("Model") then
-                                    local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                                    if primary then
-                                        data.pos = primary.Position + Vector3.new(0, 3, 0)
+                        local objName = obj.Name:lower()
+                        -- Sadece "jungle" içeren objelere bak
+                        if objName:find("jungle") then
+                            for _, sName in ipairs(data.searchNames) do
+                                if objName:find(sName:lower()) then
+                                    local pos = nil
+                                    if obj:IsA("Model") then
+                                        local primary = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                                        if primary then
+                                            pos = primary.Position
+                                        end
+                                    else
+                                        pos = obj.Position
                                     end
-                                else
-                                    data.pos = obj.Position + Vector3.new(0, 3, 0)
+                                    -- En yüksek Y pozisyonlu olanı seç (en büyük ağırlık)
+                                    if pos and pos.Y > bestY then
+                                        bestY = pos.Y
+                                        bestPos = pos + Vector3.new(0, 3, 0)
+                                    end
+                                    break
                                 end
-                                return
                             end
                         end
                     end
                 end)
-                if data.pos then break end
+            end
+            
+            if bestPos then
+                data.pos = bestPos
             end
         end
     end)
@@ -1352,15 +1374,30 @@ end
 local function getRebirthRequirement()
     local req = 0
     pcall(function()
-        -- rebirthStrength veya benzeri değer
+        -- hiddenStats'tan oku
         local hs = LP:FindFirstChild("hiddenStats")
         if hs then
-            local rs = hs:FindFirstChild("rebirthStrength") or hs:FindFirstChild("rebirthRequirement") or hs:FindFirstChild("rebirthCost")
+            local rs = hs:FindFirstChild("rebirthStrength") or hs:FindFirstChild("rebirthRequirement") or hs:FindFirstChild("rebirthCost") or hs:FindFirstChild("requiredStrength")
             if rs then req = rs.Value or 0 end
         end
+        -- Player altında direkt
         if req == 0 then
-            local rs = LP:FindFirstChild("rebirthStrength") or LP:FindFirstChild("rebirthRequirement") or LP:FindFirstChild("rebirthCost")
-            if rs and rs:IsA("ValueBase") then req = rs.Value or 0 end
+            local possibleNames = {"rebirthStrength", "rebirthRequirement", "rebirthCost", "requiredStrength", "nextRebirthStrength"}
+            for _, name in ipairs(possibleNames) do
+                local rs = LP:FindFirstChild(name)
+                if rs and rs:IsA("ValueBase") then
+                    req = rs.Value or 0
+                    if req > 0 then break end
+                end
+            end
+        end
+        -- leaderstats altında
+        if req == 0 then
+            local ls = LP:FindFirstChild("leaderstats")
+            if ls then
+                local rs = ls:FindFirstChild("RebirthReq") or ls:FindFirstChild("ReqStrength")
+                if rs then req = rs.Value or 0 end
+            end
         end
     end)
     return req
@@ -1372,8 +1409,9 @@ local function canRebirth()
     if req > 0 then
         return strength >= req
     end
-    -- Eğer requirement bulunamazsa, direkt rebirth dene
-    return true
+    -- Requirement bulunamazsa, rebirth denemek yerine false dön
+    -- (Sonsuz rebirth spam'ini engelle)
+    return false
 end
 
 local function getRebirthCount()
@@ -1400,13 +1438,48 @@ local function doRebirth()
     pcall(function()
         local rEvents = RS:FindFirstChild("rEvents")
         if rEvents then
-            local rebirthRemote = rEvents:FindFirstChild("rebirthRemote")
-            if rebirthRemote then
-                if rebirthRemote:IsA("RemoteFunction") then
-                    rebirthRemote:InvokeServer("rebirthRequest")
-                elseif rebirthRemote:IsA("RemoteEvent") then
-                    rebirthRemote:FireServer("rebirthRequest")
+            -- Birden fazla remote ismi dene
+            local remoteNames = {"rebirthRemote", "rebirthEvent", "rebirth", "Rebirth", "rebirthRemoteEvent"}
+            for _, rName in ipairs(remoteNames) do
+                local rebirthRemote = rEvents:FindFirstChild(rName)
+                if rebirthRemote then
+                    -- Birden fazla argument varyasyonu dene
+                    local args = {"rebirthRequest", "rebirth", "Rebirth", "doRebirth", "requestRebirth"}
+                    for _, arg in ipairs(args) do
+                        pcall(function()
+                            if rebirthRemote:IsA("RemoteFunction") then
+                                rebirthRemote:InvokeServer(arg)
+                            elseif rebirthRemote:IsA("RemoteEvent") then
+                                rebirthRemote:FireServer(arg)
+                            end
+                        end)
+                    end
+                    -- Argsız da dene
+                    pcall(function()
+                        if rebirthRemote:IsA("RemoteFunction") then
+                            rebirthRemote:InvokeServer()
+                        elseif rebirthRemote:IsA("RemoteEvent") then
+                            rebirthRemote:FireServer()
+                        end
+                    end)
+                    success = true
+                    break
                 end
+            end
+        end
+        -- Player altındaki rebirth event'i de dene
+        if not success then
+            local pEvent = LP:FindFirstChild("rebirthRemote") or LP:FindFirstChild("rebirthEvent") or LP:FindFirstChild("muscleEvent")
+            if pEvent then
+                pcall(function()
+                    if pEvent:IsA("RemoteEvent") then
+                        pEvent:FireServer("rebirth")
+                        pEvent:FireServer("rebirthRequest")
+                    elseif pEvent:IsA("RemoteFunction") then
+                        pEvent:InvokeServer("rebirth")
+                        pEvent:InvokeServer("rebirthRequest")
+                    end
+                end)
                 success = true
             end
         end
@@ -1730,6 +1803,8 @@ addSection(Pages.Farm, "🚀 FARM KONTROL")
 ------------------------------------------------------------
 local function stopFarm()
     States.FarmActive = false
+    globalRepSpamActive = false -- TÜM rep spam'leri ANINDA durdur
+    farmSessionId = farmSessionId + 1 -- Eski session'daki tüm loop'lar ölür
     if farmMainConn then pcall(function() farmMainConn:Disconnect() end); farmMainConn = nil end
     if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
     if farmLockConn then pcall(function() farmLockConn:Disconnect() end); farmLockConn = nil end
@@ -1778,7 +1853,7 @@ local function startFarm()
     -- TIMER LOOP (her saniye güncelle)
     -- ═══════════════════════════════════════════════════════
     spawn(function()
-        while States.FarmActive do
+        while States.FarmActive and isSessionAlive() do
             pcall(function()
                 local elapsed = tick() - farmStartTime
                 farmTimerLabel.Text = "⏱ Süre: " .. formatTime(elapsed)
@@ -1806,18 +1881,24 @@ local function startFarm()
     -- 🔥🔥🔥 TANRI HIZI REP SPAM SİSTEMİ 🔥🔥🔥
     -- ═══════════════════════════════════════════════════════
     local repSpamActive = false
+    local mySession = farmSessionId -- Bu session'a ait loop'lar sadece bu ID ile çalışır
+    
+    local function isSessionAlive()
+        return States.FarmActive and farmSessionId == mySession
+    end
     
     local function startGodRepSpam()
         repSpamActive = true
+        globalRepSpamActive = true
         
-        -- ═══ HEARTBEAT: Her frame 10 rep ═══
+        -- ═══ HEARTBEAT: Her frame 3 rep + cooldown bypass ═══
         if farmRepConn then pcall(function() farmRepConn:Disconnect() end) end
         farmRepConn = RunService.Heartbeat:Connect(function()
-            if not repSpamActive or not States.FarmActive then return end
+            if not repSpamActive or not globalRepSpamActive or not isSessionAlive() then return end
             pcall(function()
                 local e = LP:FindFirstChild("muscleEvent")
                 if e then
-                    for i = 1, 10 do
+                    for i = 1, 3 do
                         e:FireServer("rep")
                     end
                 end
@@ -1837,74 +1918,35 @@ local function startFarm()
             end)
         end)
         
-        -- ═══ PARALEL LOOP 1: 25 rep / 0.01s ═══
+        -- ═══ PARALEL LOOP 1: 10 rep / 0.05s ═══
         spawn(function()
-            while repSpamActive and States.FarmActive do
+            while repSpamActive and globalRepSpamActive and isSessionAlive() do
                 pcall(function()
                     local e = LP:FindFirstChild("muscleEvent")
                     if e then
-                        for i = 1, 25 do e:FireServer("rep") end
+                        for i = 1, 10 do e:FireServer("rep") end
                     end
                 end)
-                task.wait(0.01)
+                task.wait(0.05)
             end
         end)
         
-        -- ═══ PARALEL LOOP 2: 25 rep / 0.01s ═══
+        -- ═══ PARALEL LOOP 2: 10 rep / 0.05s ═══
         spawn(function()
-            while repSpamActive and States.FarmActive do
+            while repSpamActive and globalRepSpamActive and isSessionAlive() do
                 pcall(function()
                     local e = LP:FindFirstChild("muscleEvent")
                     if e then
-                        for i = 1, 25 do e:FireServer("rep") end
+                        for i = 1, 10 do e:FireServer("rep") end
                     end
                 end)
-                task.wait(0.01)
-            end
-        end)
-        
-        -- ═══ PARALEL LOOP 3: 20 rep / 0.02s ═══
-        spawn(function()
-            while repSpamActive and States.FarmActive do
-                pcall(function()
-                    local e = LP:FindFirstChild("muscleEvent")
-                    if e then
-                        for i = 1, 20 do e:FireServer("rep") end
-                    end
-                end)
-                task.wait(0.02)
-            end
-        end)
-        
-        -- ═══ PARALEL LOOP 4: 20 rep / 0.02s ═══
-        spawn(function()
-            while repSpamActive and States.FarmActive do
-                pcall(function()
-                    local e = LP:FindFirstChild("muscleEvent")
-                    if e then
-                        for i = 1, 20 do e:FireServer("rep") end
-                    end
-                end)
-                task.wait(0.02)
-            end
-        end)
-        
-        -- ═══ PARALEL LOOP 5: 15 rep / 0.03s ═══
-        spawn(function()
-            while repSpamActive and States.FarmActive do
-                pcall(function()
-                    local e = LP:FindFirstChild("muscleEvent")
-                    if e then
-                        for i = 1, 15 do e:FireServer("rep") end
-                    end
-                end)
-                task.wait(0.03)
+                task.wait(0.05)
             end
         end)
         
         -- ═══ SÜREKLI COOLDOWN BYPASS ═══
         spawn(function()
-            while repSpamActive and States.FarmActive do
+            while repSpamActive and globalRepSpamActive and isSessionAlive() do
                 pcall(function()
                     if Character then
                         for _, tool in pairs(Character:GetChildren()) do
@@ -1928,13 +1970,14 @@ local function startFarm()
                         end
                     end
                 end)
-                task.wait(0.05)
+                task.wait(0.1)
             end
         end)
     end
     
     local function stopGodRepSpam()
         repSpamActive = false
+        globalRepSpamActive = false
         if farmRepConn then pcall(function() farmRepConn:Disconnect() end); farmRepConn = nil end
     end
     
@@ -1942,7 +1985,7 @@ local function startFarm()
     -- 🔄 ANA FARM DÖNGÜSÜ
     -- ═══════════════════════════════════════════════════════
     spawn(function()
-        while States.FarmActive do
+        while States.FarmActive and isSessionAlive() do
             local ok, err = pcall(function()
                 
                 -- ══════ ADIM 1: IŞINLAN ══════
@@ -1982,7 +2025,7 @@ local function startFarm()
                 
                 -- Rebirth kontrolü döngüsü
                 local lastStatUpdate = 0
-                while States.FarmActive do
+                while States.FarmActive and isSessionAlive() do
                     local now = tick()
                     
                     -- İstatistikleri 0.5s'de bir güncelle
@@ -2133,7 +2176,8 @@ local fastFarmRepSpam = false
 
 local function stopFastFarm()
     States.FastFarmActive = false
-    fastFarmRepSpam = false
+    globalRepSpamActive = false
+    fastFarmSessionId = fastFarmSessionId + 1
     if fastFarmConn then pcall(function() fastFarmConn:Disconnect() end); fastFarmConn = nil end
     farmStatusLabel.Text = "⏸ Fast Farm durduruldu"
 end
@@ -2144,18 +2188,51 @@ addToggle(Pages.Farm, "⚡ Fast Farm (Sadece Kas - Rebirth Yok)", false, functio
         -- Rebirth Farm aktifse durdur
         if States.FarmActive then stopFarm() end
         
+        -- Ağırlık seçildiyse ışınlan + E bas
+        if States.SelectedWeight then
+            local weightData = weightLocations[States.SelectedWeight]
+            findWeightPositions()
+            
+            farmStatusLabel.Text = "⚡ Işınlanıyor: " .. (weightData.name or "")
+            farmStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 0)
+            
+            if weightData.pos and Character and Character:FindFirstChild("HumanoidRootPart") then
+                Character.HumanoidRootPart.CFrame = CFrame.new(weightData.pos)
+            end
+            task.wait(0.3)
+            
+            -- E bas (ağırlığı al)
+            pressE()
+            task.wait(0.2)
+            pressE()
+            task.wait(0.15)
+            
+            -- Swift Samurai petlerini tak
+            ultraFastPetSwap(States.FarmPetSwiftSamurai, States.FarmSwiftCount)
+            task.wait(0.05)
+        end
+        
+        local myFastSession = fastFarmSessionId
+        
         fastFarmRepSpam = true
-        farmStatusLabel.Text = "🔥 Fast Farm aktif - TANRI HIZI kasmal"
+        globalRepSpamActive = true
+        farmStatusLabel.Text = "🔥 Fast Farm aktif - TANRI HIZI kasılıyor"
         farmStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 0)
         
-        -- Heartbeat: Her frame 10 rep + cooldown bypass
+        -- Auto Lift aç
+        pcall(function()
+            local a = LP:FindFirstChild("autoLiftEnabled")
+            if a then a.Value = true end
+        end)
+        
+        -- Heartbeat: Her frame 3 rep + cooldown bypass
         if fastFarmConn then pcall(function() fastFarmConn:Disconnect() end) end
         fastFarmConn = RunService.Heartbeat:Connect(function()
-            if not fastFarmRepSpam then return end
+            if not fastFarmRepSpam or not globalRepSpamActive or fastFarmSessionId ~= myFastSession then return end
             pcall(function()
                 local e = LP:FindFirstChild("muscleEvent")
                 if e then
-                    for i = 1, 10 do e:FireServer("rep") end
+                    for i = 1, 3 do e:FireServer("rep") end
                 end
                 if Character then
                     for _, tool in pairs(Character:GetChildren()) do
@@ -2172,19 +2249,17 @@ addToggle(Pages.Farm, "⚡ Fast Farm (Sadece Kas - Rebirth Yok)", false, functio
             end)
         end)
         
-        -- Paralel loop'lar
-        for loopIdx = 1, 5 do
+        -- Paralel loop'lar (optimize edilmiş: 2 loop, 10 rep, 0.05s)
+        for loopIdx = 1, 2 do
             spawn(function()
-                local repCount = (loopIdx <= 2) and 25 or 20
-                local interval = (loopIdx <= 2) and 0.01 or 0.02
-                while fastFarmRepSpam and States.FastFarmActive do
+                while fastFarmRepSpam and globalRepSpamActive and States.FastFarmActive and fastFarmSessionId == myFastSession do
                     pcall(function()
                         local e = LP:FindFirstChild("muscleEvent")
                         if e then
-                            for i = 1, repCount do e:FireServer("rep") end
+                            for i = 1, 10 do e:FireServer("rep") end
                         end
                     end)
-                    task.wait(interval)
+                    task.wait(0.05)
                 end
             end)
         end
@@ -2214,171 +2289,106 @@ local autoLiftGPHooked = false
 addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Bedava Aç)", false, function(v)
     States.AutoLiftGamepass = v
     if v then
-        -- ═══════════════════════════════════════════════════
-        -- GAMEPASS BYPASS: Sahiplik kontrolünü atla
-        -- ═══════════════════════════════════════════════════
+        -- ═════════════════════════════════════════════════
+        -- GAMEPASS BYPASS: Değerleri true yap + GUI butonunu görünür yap
+        -- ═════════════════════════════════════════════════
         
-        -- BYPASS 1: Oyuncunun gamepass sahiplik değerlerini true yap
+        -- BYPASS 1: Tüm olası değerleri true yap
         pcall(function()
-            -- autoLiftEnabled değerini oluştur veya true yap
-            local a = LP:FindFirstChild("autoLiftEnabled")
-            if a then 
-                a.Value = true 
-            else
-                -- Değer yoksa oluştur
-                local newVal = Instance.new("BoolValue")
-                newVal.Name = "autoLiftEnabled"
-                newVal.Value = true
-                newVal.Parent = LP
-            end
-            
-            -- autoLiftOwned / hasAutoLift gibi değerleri de true yap
-            local possibleNames = {"autoLiftOwned", "hasAutoLift", "autoLift", "ownAutoLift", "autoLiftGamepass"}
+            local possibleNames = {"autoLiftEnabled", "autoLiftOwned", "hasAutoLift", "autoLift", "ownAutoLift", "autoLiftGamepass"}
             for _, name in ipairs(possibleNames) do
                 local val = LP:FindFirstChild(name)
                 if val then
                     pcall(function() val.Value = true end)
+                else
+                    pcall(function()
+                        local newVal = Instance.new("BoolValue")
+                        newVal.Name = name
+                        newVal.Value = true
+                        newVal.Parent = LP
+                    end)
                 end
             end
-            
-            -- hiddenStats içinde aynı kontrol
             local hs = LP:FindFirstChild("hiddenStats")
             if hs then
                 for _, name in ipairs(possibleNames) do
                     local val = hs:FindFirstChild(name)
-                    if val then
-                        pcall(function() val.Value = true end)
-                    end
+                    if val then pcall(function() val.Value = true end) end
                 end
-                local al = hs:FindFirstChild("autoLiftEnabled")
-                if al then al.Value = true end
             end
         end)
         
-        -- BYPASS 2: MarketplaceService Hook (gamepass sahiplik kontrolünü bypass)
+        -- BYPASS 2: MarketplaceService Hook
         if not autoLiftGPHooked then
             pcall(function()
                 local MPS = game:GetService("MarketplaceService")
-                local originalOwns = MPS.UserOwnsGamePassAsync
-                
-                -- Hook: Auto Lift gamepass ID'leri için true dön
                 if hookfunction then
                     local old
                     old = hookfunction(MPS.UserOwnsGamePassAsync, function(self, userId, gamePassId)
-                        -- Auto Lift gamepass kontrolü gelirse true dön
-                        if States.AutoLiftGamepass then
-                            return true
-                        end
+                        if States.AutoLiftGamepass then return true end
                         return old(self, userId, gamePassId)
                     end)
-                    autoLiftGPHooked = true
-                elseif newcclosure and hookfunction then
-                    hookfunction(MPS.UserOwnsGamePassAsync, newcclosure(function(self, userId, gamePassId)
-                        if States.AutoLiftGamepass then
-                            return true
-                        end
-                        return originalOwns(self, userId, gamePassId)
-                    end))
                     autoLiftGPHooked = true
                 end
             end)
         end
         
-        -- BYPASS 3: Oyundaki Auto Lift butonunu bul ve programatik tıkla
+        -- BYPASS 3: GUI Auto Lift butonunu GÖRÜNÜR yap + tıkla
         pcall(function()
             local pg = LP:FindFirstChild("PlayerGui")
             if pg then
                 for _, gui in pairs(pg:GetDescendants()) do
                     pcall(function()
-                        if gui:IsA("TextButton") or gui:IsA("ImageButton") then
-                            local n = gui.Name:lower()
-                            local parentName = gui.Parent and gui.Parent.Name:lower() or ""
-                            -- Auto Lift butonu bul
-                            if n:find("autolift") or n:find("auto_lift") or n:find("autolifttoggle")
-                               or parentName:find("autolift") or parentName:find("auto_lift") then
-                                -- Butona programatik tıkla (fireclick)
-                                pcall(function()
-                                    if fireclickdetector then
-                                        fireclickdetector(gui)
-                                    end
-                                end)
-                                pcall(function()
-                                    -- MouseButton1Click sinyalini tetikle
-                                    gui.MouseButton1Click:Fire()
-                                end)
-                                -- Firesignal yöntemi (executor desteği varsa)
-                                pcall(function()
-                                    if firesignal then
-                                        firesignal(gui.MouseButton1Click)
-                                    end
-                                end)
+                        local n = gui.Name:lower()
+                        if n:find("autolift") or n:find("auto_lift") then
+                            if gui:IsA("GuiObject") then gui.Visible = true end
+                            if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+                                pcall(function() if firesignal then firesignal(gui.MouseButton1Click) end end)
+                                pcall(function() gui.MouseButton1Click:Fire() end)
                             end
                         end
-                        -- "auto lift" yazılı Image butonları
-                        if gui:IsA("ImageButton") then
-                            local img = gui.Image:lower()
-                            if img:find("autolift") or img:find("auto_lift") then
-                                pcall(function() gui.MouseButton1Click:Fire() end)
-                                pcall(function()
-                                    if firesignal then firesignal(gui.MouseButton1Click) end
-                                end)
-                            end
+                        if gui.Parent and gui.Parent.Name:lower():find("autolift") then
+                            if gui:IsA("GuiObject") then gui.Visible = true end
                         end
                     end)
                 end
             end
         end)
         
-        -- BYPASS 4: muscleEvent ile autoLift aktive et
+        -- BYPASS 4: Remote event'ler
         pcall(function()
             local e = LP:FindFirstChild("muscleEvent")
             if e then
                 e:FireServer("activateAutoLift")
                 e:FireServer("autoLift")
-                e:FireServer("useGamepass", "Auto Lift")
-                e:FireServer("gamepassActivate", "Auto Lift")
                 e:FireServer("toggleAutoLift")
                 e:FireServer("setAutoLift", true)
             end
         end)
         
-        -- BYPASS 5: rEvents üzerinden aktive et
-        pcall(function()
-            local rEvents = RS:FindFirstChild("rEvents")
-            if rEvents then
-                for _, remote in pairs(rEvents:GetChildren()) do
-                    local rn = remote.Name:lower()
-                    if rn:find("autolift") or rn:find("auto_lift") or rn:find("gamepass") then
-                        pcall(function()
-                            if remote:IsA("RemoteEvent") then
-                                remote:FireServer("autoLift")
-                                remote:FireServer("Auto Lift")
-                                remote:FireServer(true)
-                            elseif remote:IsA("RemoteFunction") then
-                                remote:InvokeServer("autoLift")
-                                remote:InvokeServer("Auto Lift")
-                                remote:InvokeServer(true)
-                            end
-                        end)
-                    end
-                end
-            end
-        end)
-        
-        -- ═══ Sürekli aktif tut (Heartbeat loop) ═══
+        -- ═══ Sürekli aktif tut + GUI görünür tut ═══
         if autoLiftGPConn then pcall(function() autoLiftGPConn:Disconnect() end) end
         autoLiftGPConn = RunService.Heartbeat:Connect(function()
             if not States.AutoLiftGamepass then return end
             pcall(function()
-                -- autoLiftEnabled sürekli true
                 local a = LP:FindFirstChild("autoLiftEnabled")
                 if a then a.Value = true end
-                
-                -- hiddenStats içindeki değer de true
+                local al2 = LP:FindFirstChild("autoLiftOwned")
+                if al2 then al2.Value = true end
                 local hs = LP:FindFirstChild("hiddenStats")
                 if hs then
                     local al = hs:FindFirstChild("autoLiftEnabled")
                     if al then al.Value = true end
+                end
+                local pg = LP:FindFirstChild("PlayerGui")
+                if pg then
+                    for _, gui in pairs(pg:GetDescendants()) do
+                        pcall(function()
+                            if gui:IsA("GuiObject") and gui.Name:lower():find("autolift") then
+                                gui.Visible = true
+                            end
+                        end)
+                    end
                 end
             end)
         end)
@@ -2389,13 +2399,11 @@ addToggle(Pages.Farm, "🏋 Auto Lift Gamepass (Bedava Aç)", false, function(v)
             Duration = 4
         })
     else
-        -- Kapat
         pcall(function()
             local a = LP:FindFirstChild("autoLiftEnabled")
             if a then a.Value = false end
         end)
         if autoLiftGPConn then pcall(function() autoLiftGPConn:Disconnect() end); autoLiftGPConn = nil end
-        
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "🏋 Auto Lift",
             Text = "Auto Lift kapatıldı.",
